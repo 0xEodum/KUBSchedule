@@ -1,0 +1,56 @@
+name: flutter_application_1
+description: "A new Flutter project."
+
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.3 <4.0.0'
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_svg: ^1.0.0
+  intl: ^0.17.0
+  http: ^0.13.3
+  flutter_dotenv: ^5.0.2
+  table_calendar: ^3.0.0
+  shared_preferences: ^2.0.15
+
+
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  
+  flutter_lints: ^3.0.0
+
+
+flutter:
+  assets:
+    - assets/loader.gif
+    - assets/person.svg
+    - assets/search_schedule.svg
+    - assets/place_icon.svg
+    - assets/group_icon.svg
+    - assets/teacher_icon.svg
+    - .env
+    - assets/no_data.svg
+    - assets/calendar.svg
+    - assets/remotely.svg
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+        - asset: fonts/Roboto-Bold.ttf
+          weight: 700
+        - asset: fonts/Roboto-Italic.ttf
+          style: italic
+ 
+  uses-material-design: true
+
+
