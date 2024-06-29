@@ -42,6 +42,8 @@ flutter:
     - assets/no_data.svg
     - assets/calendar.svg
     - assets/remotely.svg
+    - assets/sun_icon.svg
+    - assets/moon_icon.svg
   fonts:
     - family: Roboto
       fonts:

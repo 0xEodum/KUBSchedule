@@ -199,7 +199,6 @@ class _PlaceSchedulePageState extends State<PlaceSchedulePage> {
         children: [
           GestureDetector(
             onTap: () {
-              SchedulePreferences.clearSchedule();
               Navigator.push(
                 context,
                 MaterialPageRoute(

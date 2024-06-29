@@ -201,7 +201,6 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
         children: [
           GestureDetector(
             onTap: () {
-              SchedulePreferences.clearSchedule();
               Navigator.push(
                 context,
                 MaterialPageRoute(

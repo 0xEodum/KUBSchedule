@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
 import 'package:flutter_application_1/utils/schedule_preferences.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:http/http.dart' as http;
@@ -107,9 +108,17 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        icon: Icon(Icons.arrow_back),
+        onPressed: () async {
+          await SchedulePreferences.clearSchedule();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ScheduleSelectionPage(),
+            ),
+          );
+        },
+      ),
       ),
       body: SafeArea(
         child: _isLoading

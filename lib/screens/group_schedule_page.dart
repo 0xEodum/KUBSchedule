@@ -175,7 +175,6 @@ class _GroupSchedulePageState extends State<GroupSchedulePage> {
         children: [
           GestureDetector(
             onTap: () {
-              SchedulePreferences.clearSchedule();
               Navigator.push(
                 context,
                 MaterialPageRoute(
