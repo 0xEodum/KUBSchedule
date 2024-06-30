@@ -460,7 +460,7 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
     if (lightModeColor == Colors.blue[50]) {
       return const Color.fromARGB(255, 63, 110, 180);
     } else if (lightModeColor == Colors.orange[50]) {
-      return Color.fromARGB(255, 177, 92, 45)!;
+      return Color.fromARGB(255, 177, 92, 45);
     } else if (lightModeColor == Colors.green[50]) {
       return const Color.fromARGB(255, 75, 131, 78);
     } else {
