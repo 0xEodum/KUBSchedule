@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/utils/theme_notifier.dart';
+import 'package:flutter_application_1/utils/theme_preferences.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class SettingsScreen extends StatefulWidget {
   final Function(bool) onThemeChanged;
   final bool isDarkMode;
 
-  const SettingsScreen({Key? key, required this.onThemeChanged, required this.isDarkMode}) : super(key: key);
+  const SettingsScreen(
+      {Key? key, required this.onThemeChanged, required this.isDarkMode})
+      : super(key: key);
 
   @override
   _SettingsScreenState createState() => _SettingsScreenState();
@@ -18,7 +22,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    isDarkMode = widget.isDarkMode;
+    isDarkMode = ThemeNotifier().isDarkMode;
+    _loadTheme();
+  }
+
+  Future<void> _loadTheme() async {
+    final darkMode = await ThemePreferences.isDarkMode();
+    if (mounted) {
+      setState(() {
+        isDarkMode = darkMode;
+      });
+    }
+  }
+
+  void _toggleTheme(bool value) {
+    ThemeNotifier().toggleTheme();
+    setState(() {
+      isDarkMode = value;
+    });
   }
 
   @override
@@ -78,12 +99,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                               Switch(
                                 value: isDarkMode,
-                                onChanged: (value) {
-                                  setState(() {
-                                    isDarkMode = value;
-                                  });
-                                  widget.onThemeChanged(value);
-                                },
+                                onChanged: _toggleTheme,
                                 activeColor: Colors.white,
                                 inactiveThumbColor: Colors.black,
                                 activeTrackColor: Colors.grey,

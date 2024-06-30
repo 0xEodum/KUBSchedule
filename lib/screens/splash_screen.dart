@@ -8,7 +8,9 @@ import 'package:flutter_application_1/utils/schedule_preferences.dart';
 import 'package:flutter_application_1/utils/theme_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final Function(ThemeMode) setThemeMode;
+
+  const SplashScreen({Key? key, required this.setThemeMode}) : super(key: key);
 
   @override
   _SplashScreenState createState() => _SplashScreenState();
@@ -16,14 +18,24 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool isDarkMode = false;
+
   @override
   void initState() {
     super.initState();
+    _loadTheme();
     Timer(const Duration(seconds: 3), () {
       _navigateToNextScreen();
     });
   }
 
+  Future<void> _loadTheme() async {
+    final themeMode = await ThemePreferences.getThemeMode();
+    final darkMode = await ThemePreferences.isDarkMode();
+    setState(() {
+      isDarkMode = darkMode;
+    });
+    widget.setThemeMode(themeMode);
+  }
 
   void _navigateToNextScreen() async {
     final savedSchedule = await SchedulePreferences.getSchedule();
@@ -84,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDarkMode ? Colors.black : Colors.white,
       body: SafeArea(
         child: Center(
           child: Column(
@@ -108,3 +120,4 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
+

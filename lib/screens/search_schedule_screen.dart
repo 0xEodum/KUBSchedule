@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
 import 'package:flutter_application_1/screens/settings_screen.dart';
 import 'package:flutter_application_1/utils/schedule_preferences.dart';
+import 'package:flutter_application_1/utils/theme_notifier.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -25,20 +26,34 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
   int _selectedIndex = 0;
-  bool isDarkMode = false;
+  late bool isDarkMode;
 
   @override
   void initState() {
     super.initState();
     _loadTheme();
     _searchController.addListener(_onSearchChanged);
+    isDarkMode = ThemeNotifier().isDarkMode;
+    ThemeNotifier().addListener(_onThemeChanged);
+  }
+
+
+
+  void _onThemeChanged() {
+    if (mounted) {
+      setState(() {
+        isDarkMode = ThemeNotifier().isDarkMode;
+      });
+    }
   }
 
   Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      isDarkMode = prefs.getBool('isDarkMode') ?? false;
-    });
+    final darkMode = await ThemePreferences.isDarkMode();
+    if (mounted) {
+      setState(() {
+        isDarkMode = darkMode;
+      });
+    }
   }
 
   Future<void> _saveTheme(bool value) async {
@@ -97,6 +112,7 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   void dispose() {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    ThemeNotifier().removeListener(_onThemeChanged);
     super.dispose();
   }
 

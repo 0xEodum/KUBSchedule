@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/settings_screen.dart';
+import 'package:flutter_application_1/utils/theme_notifier.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -15,7 +16,38 @@ class ScheduleSelectionPage extends StatefulWidget {
 
 class _ScheduleSelectionPageState extends State<ScheduleSelectionPage> {
   int _selectedIndex = 0;
-  bool isDarkMode = false;
+  late bool isDarkMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTheme();
+    isDarkMode = ThemeNotifier().isDarkMode;
+    ThemeNotifier().addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    ThemeNotifier().removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) {
+      setState(() {
+        isDarkMode = ThemeNotifier().isDarkMode;
+      });
+    }
+  }
+
+  Future<void> _loadTheme() async {
+    final darkMode = await ThemePreferences.isDarkMode();
+    if (mounted) {
+      setState(() {
+        isDarkMode = darkMode;
+      });
+    }
+  }
 
   String getCurrentDate() {
     initializeDateFormatting('ru_RU', null);
