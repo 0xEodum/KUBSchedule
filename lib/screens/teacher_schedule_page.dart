@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/screens/settings_screen.dart';
+import 'package:flutter_application_1/utils/theme_notifier.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
@@ -27,12 +29,30 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   bool isLoading = true;
   late DateTime _currentDate;
   CalendarFormat _calendarFormat = CalendarFormat.month;
+  int _selectedIndex = 0;
+  late bool isDarkMode;
 
   @override
   void initState() {
     super.initState();
     _currentDate = widget.currentDate;
+    isDarkMode = ThemeNotifier().isDarkMode;
+    ThemeNotifier().addListener(_onThemeChanged);
     fetchLessons();
+  }
+
+  @override
+  void dispose() {
+    ThemeNotifier().removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) {
+      setState(() {
+        isDarkMode = ThemeNotifier().isDarkMode;
+      });
+    }
   }
 
   Future<void> fetchLessons() async {
@@ -109,14 +129,15 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: isDarkMode ? Colors.black : Colors.white,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
-            isCalendarVisible
-                ? _buildCalendar()
-                : Expanded(
-                    child: GestureDetector(
+            Expanded(
+              child: isCalendarVisible
+                  ? _buildCalendar()
+                  : GestureDetector(
                       onHorizontalDragEnd: (details) {
                         if (details.primaryVelocity! < 0) {
                           _onSwipeLeft();
@@ -131,35 +152,92 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
                               : ListView.builder(
                                   itemCount: lessons.length,
                                   itemBuilder: (context, index) {
-                                    return _buildLessonCard(lessons[index]);
+                                    final lesson = lessons[index];
+                                    if (lesson['number'] == 0) {
+                                      return _buildKSRSCard(lesson);
+                                    } else {
+                                      return _buildLessonCard(lesson);
+                                    }
                                   },
                                 ),
                     ),
-                  ),
+            ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        items: [
+          BottomNavigationBarItem(
+            icon: SvgPicture.asset(
+              'assets/teacher_icon.svg',
+              color: _selectedIndex == 0
+                  ? (isDarkMode ? Colors.white : Colors.blue)
+                  : (isDarkMode ? Colors.grey : Colors.black),
+            ),
+            label: 'Расписание',
+          ),
+          BottomNavigationBarItem(
+            icon: SvgPicture.asset(
+              'assets/settings.svg',
+              color: _selectedIndex == 1
+                  ? (isDarkMode ? Colors.white : Colors.blue)
+                  : (isDarkMode ? Colors.grey : Colors.black),
+            ),
+            label: 'Настройки',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
+        unselectedItemColor: isDarkMode ? Colors.grey : Colors.black,
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        onTap: _onItemTapped,
       ),
     );
   }
 
-  Widget _buildNoDataFound() {
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SettingsScreen(
+            isDarkMode: isDarkMode,
+            onThemeChanged: (bool newValue) {
+              setState(() {
+                isDarkMode = newValue;
+              });
+            },
+          ),
+        ),
+      ).then((_) {
+        setState(() {
+          _selectedIndex = 0;
+        });
+      });
+    }
+  }
+
+   Widget _buildNoDataFound() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SvgPicture.asset(
-            'assets/person.svg',
+            isDarkMode ? 'assets/person_white.svg' : 'assets/person.svg',
             width: 300,
             height: 300,
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Ничего не найдено',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.w400,
-              color: Colors.black,
+              color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
         ],
@@ -190,45 +268,36 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
         _currentDate = focusedDay;
       },
       locale: 'ru_RU',
-    startingDayOfWeek: StartingDayOfWeek.monday,
-    daysOfWeekVisible: true,
-    headerStyle: const HeaderStyle(
-      formatButtonVisible: false,
-      titleCentered: true,
-      titleTextStyle: TextStyle(fontWeight: FontWeight.bold),
-    ),
-    calendarStyle: CalendarStyle(
-      weekendTextStyle: const TextStyle(color: Colors.red),
-      outsideTextStyle: const TextStyle(color: Colors.grey),
-      todayDecoration: BoxDecoration(
-        color: Colors.blue[200],
-        shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(4),
+      startingDayOfWeek: StartingDayOfWeek.monday,
+      daysOfWeekVisible: true,
+      headerStyle: HeaderStyle(
+        formatButtonVisible: false,
+        titleCentered: true,
+        titleTextStyle: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
       ),
-      selectedDecoration: BoxDecoration(
-        color: const Color.fromRGBO(34, 139, 230, 1),
-        shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(4),
+      calendarStyle: CalendarStyle(
+        weekendTextStyle: TextStyle(color: isDarkMode ? Colors.red[300] : Colors.red),
+        outsideTextStyle: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey),
+        todayDecoration: BoxDecoration(
+          color: isDarkMode ? Colors.blue[700] : Colors.blue[200],
+          shape: BoxShape.rectangle,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        selectedDecoration: BoxDecoration(
+          color: const Color.fromRGBO(34, 139, 230, 1),
+          shape: BoxShape.rectangle,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        defaultTextStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
       ),
-    ),
-    daysOfWeekStyle: const DaysOfWeekStyle(
-      weekendStyle: TextStyle(color: Colors.red),
-    ),
-    calendarBuilders: CalendarBuilders(
-      defaultBuilder: (context, day, focusedDay) {
-        if (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
-          return Container(
-            margin: const EdgeInsets.all(4.0),
-            alignment: Alignment.center,
-            child: Text(
-              day.day.toString(),
-              style: const TextStyle(color: Colors.red),
-            ),
-          );
-        }
-      },
-    ),
-  );
+      daysOfWeekStyle: DaysOfWeekStyle(
+        weekendStyle: TextStyle(color: isDarkMode ? Colors.red[300] : Colors.red),
+        weekdayStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+      ),
+    );
   }
 
   Widget _buildHeader() {
@@ -274,20 +343,20 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F2),
+                color: isDarkMode ? Colors.grey[800] : const Color(0xFFF2F2F2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   SvgPicture.asset('assets/calendar.svg',
-                      width: 19, height: 19),
+                      width: 19, height: 19, color: isDarkMode ? Colors.white : Colors.black),
                   const SizedBox(width: 8),
                   Text(
                     DateFormat('dd MMM, EE', 'ru').format(_currentDate),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
-                      color: Colors.black,
+                      color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
                 ],
@@ -299,12 +368,67 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
     );
   }
 
+  Widget _buildKSRSCard(Map<String, dynamic> ksrs) {
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    color: isDarkMode ? Colors.grey[800] : Colors.white,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'КСРС',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              Text(
+                DateFormat('dd.MM.yyyy').format(DateTime.parse(ksrs['date'])),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Группы: ${ksrs['groups'].map((g) => g['name']).join(', ')}',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.white70 : Colors.grey[600],
+            ),
+          ),
+          if (ksrs['theme'] != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Тема: ${ksrs['theme']}',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
   Widget _buildLessonCard(Map<String, dynamic> lesson) {
     final type = lesson['type'];
     final startTime = _getStartTime(lesson['number']);
     final endTime = _getEndTime(lesson['number']);
-    final color =
-        Color(int.parse(type['color'].substring(1, 7), radix: 16) + 0xFF000000);
+    final color = Color(int.parse(type['color'].substring(1, 7), radix: 16) + 0xFF000000);
     final isRemotely = lesson['is_remotely'] ?? false;
 
     return Card(
@@ -312,6 +436,7 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
+      color: isDarkMode ? Colors.grey[800] : Colors.white,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: IntrinsicHeight(
@@ -349,17 +474,23 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('$startTime - $endTime',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w400, fontSize: 12)),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w400, 
+                                  fontSize: 12,
+                                  color: isDarkMode ? Colors.white : Colors.black)),
                           const SizedBox(height: 4),
                           Text(lesson['discipline']['name'],
-                              style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w400)),
+                              style: TextStyle(
+                                  fontSize: 14, 
+                                  fontWeight: FontWeight.w400,
+                                  color: isDarkMode ? Colors.white : Colors.black)),
                           const SizedBox(height: 4),
                           Text(
                               lesson['groups'].map((g) => g['name']).join(', '),
-                              style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w400)),
+                              style: TextStyle(
+                                  fontSize: 12, 
+                                  fontWeight: FontWeight.w400,
+                                  color: isDarkMode ? Colors.white70 : Colors.black87)),
                         ],
                       ),
                       Positioned(
@@ -374,14 +505,15 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
                                   'assets/remotely.svg',
                                   width: 20,
                                   height: 20,
+                                  color: isDarkMode ? Colors.white : Colors.black,
                                 ),
                               ),
                             Text(
                               lesson['number'].toString(),
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w500,
-                                  color: Color.fromARGB(255, 186, 220, 255)),
+                                  color: isDarkMode ? Colors.white38 : const Color.fromARGB(255, 186, 220, 255)),
                             ),
                           ],
                         ),
@@ -391,10 +523,10 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
                         right: 0,
                         child: Text(
                           lesson['place']?['name'] ?? '',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
-                              color: Colors.grey),
+                              color: isDarkMode ? Colors.white54 : Colors.grey),
                         ),
                       ),
                     ],
