@@ -33,6 +33,10 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   int _selectedIndex = 0;
   late bool isDarkMode;
 
+  Map<String, List<dynamic>> lessonsCache = {};
+  late DateTime earliestDate;
+  late DateTime latestDate;
+
   @override
   void initState() {
     super.initState();
@@ -40,7 +44,9 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
     _currentDate = widget.currentDate;
     isDarkMode = ThemeNotifier().isDarkMode;
     ThemeNotifier().addListener(_onThemeChanged);
-    fetchLessons();
+    earliestDate = _currentDate.subtract(const Duration(days: 7));
+    latestDate = _currentDate.add(const Duration(days: 7));
+    fetchLessonsForRange(earliestDate, latestDate);
   }
 
   Future<void> _loadTheme() async {
@@ -66,18 +72,29 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
     }
   }
 
-  Future<void> fetchLessons() async {
+  Future<void> fetchLessonsForRange(DateTime start, DateTime end, {bool clearCache = false}) async {
     setState(() {
       isLoading = true;
     });
+
+    if (clearCache) {
+      lessonsCache.clear();
+    } else {
+      lessonsCache.removeWhere((key, value) {
+        final date = DateTime.parse(key);
+        return date.isAfter(start.subtract(const Duration(days: 1))) &&
+            date.isBefore(end.add(const Duration(days: 1)));
+      });
+    }
 
     final apiUrl = dotenv.env['API_URL'] ?? '';
     final headerKey = dotenv.env['API_HEADER_KEY'] ?? '';
     final headerValue = dotenv.env['API_HEADER_VALUE'] ?? '';
 
-    final dateString = DateFormat('yyyy-MM-dd').format(_currentDate);
+    final startString = DateFormat('yyyy-MM-dd').format(start);
+    final endString = DateFormat('yyyy-MM-dd').format(end);
     final url = Uri.parse(
-        '$apiUrl/api/timetable/lessons/viewer?start_date=$dateString&end_date=$dateString&teacher=${widget.teacherData['id']}');
+        '$apiUrl/api/timetable/lessons/viewer?start_date=$startString&end_date=$endString&teacher=${widget.teacherData['id']}');
 
     try {
       final response = await http.get(
@@ -85,47 +102,49 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
         headers: {headerKey: headerValue},
       );
 
-      setState(() {
-        isLoading = false;
-      });
-
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
-        setState(() {
-          lessons = data['data'];
-        });
+        final lessons = data['data'] as List<dynamic>;
+        
+        for (var lesson in lessons) {
+          final lessonDate = lesson['date'] as String;
+          if (!lessonsCache.containsKey(lessonDate)) {
+            lessonsCache[lessonDate] = [];
+          }
+          lessonsCache[lessonDate]!.add(lesson);
+        }
+
+        earliestDate = start;
+        latestDate = end;
       } else {
         print('Failed to load lessons: ${response.statusCode}');
-        setState(() {
-          lessons.clear();
-        });
       }
     } catch (e) {
       print('Error fetching lessons: $e');
-      setState(() {
-        isLoading = false;
-        lessons.clear();
-      });
     }
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   void _onSwipeLeft() {
+    final nextDate = _currentDate.add(const Duration(days: 1));
+    if (nextDate.isAfter(latestDate)) {
+      fetchLessonsForRange(latestDate.add(const Duration(days: 1)), latestDate.add(const Duration(days: 7)));
+    }
     setState(() {
-      _currentDate = _currentDate.add(const Duration(days: 1));
+      _currentDate = nextDate;
     });
-    fetchLessons();
   }
 
   void _onSwipeRight() {
+    final previousDate = _currentDate.subtract(const Duration(days: 1));
+    if (previousDate.isBefore(earliestDate)) {
+      fetchLessonsForRange(earliestDate.subtract(const Duration(days: 7)), earliestDate.subtract(const Duration(days: 1)));
+    }
     setState(() {
-      _currentDate = _currentDate.subtract(const Duration(days: 1));
-    });
-    fetchLessons();
-  }
-
-  void _toggleCalendar() {
-    setState(() {
-      isCalendarVisible = !isCalendarVisible;
+      _currentDate = previousDate;
     });
   }
 
@@ -134,11 +153,25 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
       _currentDate = selectedDay;
       isCalendarVisible = false;
     });
-    fetchLessons();
+    fetchLessonsForRange(
+      selectedDay.subtract(const Duration(days: 7)),
+      selectedDay.add(const Duration(days: 7)),
+      clearCache: true
+    );
   }
+
+  void _toggleCalendar() {
+    setState(() {
+      isCalendarVisible = !isCalendarVisible;
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
+    final currentDateString = DateFormat('yyyy-MM-dd').format(_currentDate);
+    final lessonsForCurrentDate = lessonsCache[currentDateString] ?? [];
+
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       body: SafeArea(
@@ -158,12 +191,12 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
                       },
                       child: isLoading
                           ? const Center(child: CircularProgressIndicator())
-                          : lessons.isEmpty
+                          : lessonsForCurrentDate.isEmpty
                               ? _buildNoDataFound()
                               : ListView.builder(
-                                  itemCount: lessons.length,
+                                  itemCount: lessonsForCurrentDate.length,
                                   itemBuilder: (context, index) {
-                                    final lesson = lessons[index];
+                                    final lesson = lessonsForCurrentDate[index];
                                     if (lesson['number'] == 0) {
                                       return _buildKSRSCard(lesson);
                                     } else {
