@@ -5,7 +5,7 @@ import 'package:flutter_application_1/screens/teacher_schedule_page.dart';
 import 'package:flutter_application_1/screens/group_schedule_page.dart';
 import 'package:flutter_application_1/screens/place_schedule_page.dart';
 import 'package:flutter_application_1/utils/schedule_preferences.dart';
-
+import 'package:flutter_application_1/utils/theme_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,6 +15,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool isDarkMode = false;
   @override
   void initState() {
     super.initState();
@@ -22,6 +23,7 @@ class _SplashScreenState extends State<SplashScreen> {
       _navigateToNextScreen();
     });
   }
+
 
   void _navigateToNextScreen() async {
     final savedSchedule = await SchedulePreferences.getSchedule();

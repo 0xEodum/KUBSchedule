@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
+import 'package:flutter_application_1/screens/settings_screen.dart';
 import 'package:flutter_application_1/utils/schedule_preferences.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'teacher_schedule_page.dart';
 import 'group_schedule_page.dart';
 import 'place_schedule_page.dart';
+import 'package:flutter_application_1/utils/theme_preferences.dart';
 
 class SearchSchedulePage extends StatefulWidget {
   const SearchSchedulePage({Key? key}) : super(key: key);
@@ -21,11 +24,26 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
+  int _selectedIndex = 0;
+  bool isDarkMode = false;
 
   @override
   void initState() {
     super.initState();
+    _loadTheme();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    });
+  }
+
+  Future<void> _saveTheme(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', value);
   }
 
   void _onSearchChanged() {
@@ -83,32 +101,33 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'Поиск расписания',
-            border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.grey, fontWeight: FontWeight.w400),
-            suffixIcon: _isSearching
-                ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.black),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {
-                        _isSearching = false;
-                        _searchResults.clear();
-                      });
-                    },
-                  )
-                : null,
-          ),
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: isDarkMode ? Colors.black : Colors.white,
+    appBar: AppBar(
+      title: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Поиск расписания',
+          border: InputBorder.none,
+          hintStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey, fontWeight: FontWeight.w400),
+          suffixIcon: _isSearching
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: isDarkMode ? Colors.white : Colors.black),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _isSearching = false;
+                      _searchResults.clear();
+                    });
+                  },
+                )
+              : null,
         ),
-        leading: IconButton(
-        icon: Icon(Icons.arrow_back),
+        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.w500),
+      ),
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black),
         onPressed: () async {
           await SchedulePreferences.clearSchedule();
           Navigator.push(
@@ -119,95 +138,168 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
           );
         },
       ),
+      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+    ),
+    body: SafeArea(
+      child: Column(
+        children: [
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : _isSearching
+                    ? _searchResults.isNotEmpty
+                        ? _buildSearchResults()
+                        : _buildNoResults()
+                    : _buildInitialContent(),
+          ),
+        ],
       ),
-      body: SafeArea(
-        child: _isLoading
-            ? Center(child: CircularProgressIndicator())
-            : _isSearching
-                ? _searchResults.isNotEmpty
-                    ? _buildSearchResults()
-                    : _buildNoResults()
-                : _buildInitialContent(),
+    ),
+    bottomNavigationBar: BottomNavigationBar(
+      key: ValueKey<int>(_selectedIndex),
+      items: [
+        BottomNavigationBarItem(
+          icon: SvgPicture.asset(
+            'assets/teacher_icon.svg',
+            color: _selectedIndex == 0
+                ? (isDarkMode ? Colors.white : Colors.blue)
+                : (isDarkMode ? Colors.grey : Colors.black),
+          ),
+          label: 'Расписание',
+        ),
+        BottomNavigationBarItem(
+          icon: SvgPicture.asset(
+            'assets/settings.svg',
+            color: _selectedIndex == 1
+                ? (isDarkMode ? Colors.white : Colors.blue)
+                : (isDarkMode ? Colors.grey : Colors.black),
+          ),
+          label: 'Настройки',
+        ),
+      ],
+      currentIndex: _selectedIndex,
+      selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
+      unselectedItemColor: isDarkMode ? Colors.grey : Colors.black,
+      backgroundColor: isDarkMode ? Colors.black : Colors.white,
+      onTap: _onItemTapped,
+    ),
+  );
+}
+
+void _onItemTapped(int index) {
+  if (index == 1) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SettingsScreen(
+          isDarkMode: isDarkMode,
+          onThemeChanged: (bool newValue) {
+            setState(() {
+              isDarkMode = newValue;
+            });
+            _saveTheme(newValue);
+          },
+        ),
       ),
-    );
+    ).then((_) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+    });
+  } else {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
+}
 
   Widget _buildInitialContent() {
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 26.0, vertical: 36.0),
-          child: SvgPicture.asset(
-            'assets/search_schedule.svg',
-            width: 300,
-            height: 320,
+  return Column(
+    children: [
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 26.0, vertical: 36.0),
+        child: SvgPicture.asset(
+          isDarkMode ? 'assets/search_schedule_dark.svg' : 'assets/search_schedule.svg',
+          width: 300,
+          height: 320,
+        ),
+      ),
+      SizedBox(height: 16),
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: Text(
+          'Начните вводить группу, преподавателя или аудиторию',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: isDarkMode ? Colors.white : Colors.black,
           ),
         ),
-        SizedBox(height: 16),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            'Начните вводить группу, преподавателя или аудиторию',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
-  Widget _buildNoResults() {
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 49.0, vertical: 56.0),
-          child: SvgPicture.asset(
-            'assets/no_data.svg',
-            width: 300,
-            height: 300,
-          ),
+Widget _buildNoResults() {
+  return Column(
+    children: [
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 49.0, vertical: 56.0),
+        child: SvgPicture.asset(
+          isDarkMode ? 'assets/no_data_dark.svg' : 'assets/no_data.svg',
+          width: 300,
+          height: 300,
         ),
-        SizedBox(height: 16),
-        const Text(
-          'Ничего не найдено',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+      SizedBox(height: 16),
+      Text(
+        'Ничего не найдено',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: isDarkMode ? Colors.white : Colors.black,
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
-  Widget _buildSearchResults() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8.0),
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final item = _searchResults[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            elevation: 2,
-            child: ListTile(
-              leading: _getLeadingIcon(item['type']),
-              title: item['type'] == 'group'
-                  ? _buildGroupTitle(item)
-                  : Text(
-                      _getTitle(item),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+Widget _buildSearchResults() {
+  return ListView.builder(
+    padding: const EdgeInsets.all(8.0),
+    itemCount: _searchResults.length,
+    itemBuilder: (context, index) {
+      final item = _searchResults[index];
+      final tileColor = _getTileColor(item['type']);
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          elevation: 2,
+          color: isDarkMode
+              ? _getDarkModeColor(tileColor)
+              : tileColor,
+          child: ListTile(
+            leading: _getLeadingIcon(item['type']),
+            title: item['type'] == 'group'
+                ? _buildGroupTitle(item)
+                : Text(
+                    _getTitle(item),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
                     ),
-              tileColor: _getTileColor(item['type']),
-              onTap: () => _navigateToSchedule(context, item),
-            ),
+                  ),
+            onTap: () => _navigateToSchedule(context, item),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   void _navigateToSchedule(BuildContext context, Map<String, dynamic> item) {
   final currentDate = DateTime.now();
@@ -267,7 +359,7 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
         assetName = 'assets/group_icon.svg';
         break;
       default:
-        assetName = 'assets/default_icon.svg';
+        assetName = 'assets/teacher_icon.svg';
     }
     return SvgPicture.asset(assetName, width: 24, height: 24);
   }
@@ -286,37 +378,40 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   }
 
   Widget _buildGroupTitle(dynamic item) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          item['data']['name'],
-          style: const TextStyle(fontWeight: FontWeight.bold),
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        item['data']['name'],
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: isDarkMode ? Colors.white : Colors.black,
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '${item['data']['faculty']['short_name']}, ${item['data']['course']} курс',
-              style: TextStyle(
-                fontWeight: FontWeight.w400,
-                fontSize: 10,
-                color: hexToColor('#767676'),
-              ),
+      ),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '${item['data']['faculty']['short_name']}, ${item['data']['course']} курс',
+            style: TextStyle(
+              fontWeight: FontWeight.w400,
+              fontSize: 10,
+              color: isDarkMode ? Colors.grey[400] : hexToColor('#767676'),
             ),
-            Text(
-              item['data']['direction']['short_name'],
-              style: TextStyle(
-                fontWeight: FontWeight.w400,
-                fontSize: 10,
-                color: hexToColor('#767676'),
-              ),
+          ),
+          Text(
+            item['data']['direction']['short_name'],
+            style: TextStyle(
+              fontWeight: FontWeight.w400,
+              fontSize: 10,
+              color: isDarkMode ? Colors.grey[400] : hexToColor('#767676'),
             ),
-          ],
-        ),
-      ],
-    );
-  }
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
   Color hexToColor(String hexString) {
   final buffer = StringBuffer();
@@ -326,15 +421,27 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
 }
 
   Color _getTileColor(String type) {
-    switch (type) {
-      case 'teacher':
-        return Colors.blue[50]!;
-      case 'place':
-        return Colors.orange[50]!;
-      case 'group':
-        return Colors.green[50]!;
-      default:
-        return Colors.white;
-    }
+  switch (type) {
+    case 'teacher':
+      return Colors.blue[50]!;
+    case 'place':
+      return Colors.orange[50]!;
+    case 'group':
+      return Colors.green[50]!;
+    default:
+      return Colors.grey[50]!;
   }
+}
+
+  Color _getDarkModeColor(Color lightModeColor) {
+  if (lightModeColor == Colors.blue[50]) {
+    return const Color.fromARGB(255, 63, 110, 180)!;
+  } else if (lightModeColor == Colors.orange[50]) {
+    return Color.fromARGB(255, 177, 92, 45)!;
+  } else if (lightModeColor == Colors.green[50]) {
+    return const Color.fromARGB(255, 75, 131, 78)!;
+  } else {
+    return Colors.grey[800]!;
+  }
+}
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/utils/schedule_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
@@ -190,7 +189,46 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
       onPageChanged: (focusedDay) {
         _currentDate = focusedDay;
       },
-    );
+      locale: 'ru_RU',
+    startingDayOfWeek: StartingDayOfWeek.monday,
+    daysOfWeekVisible: true,
+    headerStyle: const HeaderStyle(
+      formatButtonVisible: false,
+      titleCentered: true,
+      titleTextStyle: TextStyle(fontWeight: FontWeight.bold),
+    ),
+    calendarStyle: CalendarStyle(
+      weekendTextStyle: const TextStyle(color: Colors.red),
+      outsideTextStyle: const TextStyle(color: Colors.grey),
+      todayDecoration: BoxDecoration(
+        color: Colors.blue[200],
+        shape: BoxShape.rectangle,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      selectedDecoration: BoxDecoration(
+        color: const Color.fromRGBO(34, 139, 230, 1),
+        shape: BoxShape.rectangle,
+        borderRadius: BorderRadius.circular(4),
+      ),
+    ),
+    daysOfWeekStyle: const DaysOfWeekStyle(
+      weekendStyle: TextStyle(color: Colors.red),
+    ),
+    calendarBuilders: CalendarBuilders(
+      defaultBuilder: (context, day, focusedDay) {
+        if (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
+          return Container(
+            margin: const EdgeInsets.all(4.0),
+            alignment: Alignment.center,
+            child: Text(
+              day.day.toString(),
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+      },
+    ),
+  );
   }
 
   Widget _buildHeader() {
@@ -340,7 +378,7 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
                               ),
                             Text(
                               lesson['number'].toString(),
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w500,
                                   color: Color.fromARGB(255, 186, 220, 255)),

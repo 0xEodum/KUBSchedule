@@ -6,8 +6,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'search_schedule_screen.dart';
-import 'package:flutter_application_1/utils/schedule_preferences.dart';
-//import 'package:flutter_application_1/timeline.dart';
+
 
 
 class GroupSchedulePage extends StatefulWidget {
