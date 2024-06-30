@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/settings_screen.dart';
 import 'package:flutter_application_1/utils/theme_notifier.dart';
+import 'package:flutter_application_1/utils/theme_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
@@ -35,10 +36,20 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   @override
   void initState() {
     super.initState();
+    _loadTheme();
     _currentDate = widget.currentDate;
     isDarkMode = ThemeNotifier().isDarkMode;
     ThemeNotifier().addListener(_onThemeChanged);
     fetchLessons();
+  }
+
+  Future<void> _loadTheme() async {
+    final darkMode = await ThemePreferences.isDarkMode();
+    if (mounted) {
+      setState(() {
+        isDarkMode = darkMode;
+      });
+    }
   }
 
   @override
