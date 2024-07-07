@@ -52,6 +52,15 @@ flutter:
     - assets/person_white.svg
     - assets/no_data_dark.svg
     - assets/search_schedule_dark.svg
+    - assets/house.svg
+    - assets/calendar_icon.svg
+    - assets/bell.svg
+    - assets/hand.svg
+    - assets/rocket.svg
+    - assets/rocket_white.svg
+    - assets/search.svg
+    - assets/clear.svg
+    - assets/free_time_icon.svg
   fonts:
     - family: Roboto
       fonts:

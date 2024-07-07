@@ -39,58 +39,59 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _navigateToNextScreen() async {
     final savedSchedule = await SchedulePreferences.getSchedule();
-    if (savedSchedule == null) {
-      Navigator.of(context).pushReplacement(
+    Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const ScheduleSelectionPage()),
       );
-    } else {
-      final currentDate = DateTime.now();
-      switch (savedSchedule['type']) {
-        case 'teacher':
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => TeacherSchedulePage(
-                teacherData: {
-                  'id': savedSchedule['id'],
-                  'short_name': savedSchedule['name'],
-                },
-                currentDate: currentDate,
-              ),
-            ),
-          );
-          break;
-        case 'group':
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => GroupSchedulePage(
-                groupData: {
-                  'id': savedSchedule['id'],
-                  'name': savedSchedule['name'],
-                },
-                currentDate: currentDate,
-              ),
-            ),
-          );
-          break;
-        case 'place':
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => PlaceSchedulePage(
-                placeData: {
-                  'id': savedSchedule['id'],
-                  'name': savedSchedule['name'],
-                },
-                currentDate: currentDate,
-              ),
-            ),
-          );
-          break;
-        default:
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const ScheduleSelectionPage()),
-          );
-      }
-    }
+    if (savedSchedule == null) {
+      
+    } //else {
+    //   final currentDate = DateTime.now();
+    //   switch (savedSchedule['type']) {
+    //     case 'teacher':
+    //       Navigator.of(context).pushReplacement(
+    //         MaterialPageRoute(
+    //           builder: (context) => TeacherSchedulePage(
+    //             teacherData: {
+    //               'id': savedSchedule['id'],
+    //               'short_name': savedSchedule['name'],
+    //             },
+    //             currentDate: currentDate,
+    //           ),
+    //         ),
+    //       );
+    //       break;
+    //     case 'group':
+    //       Navigator.of(context).pushReplacement(
+    //         MaterialPageRoute(
+    //           builder: (context) => GroupSchedulePage(
+    //             groupData: {
+    //               'id': savedSchedule['id'],
+    //               'name': savedSchedule['name'],
+    //             },
+    //             currentDate: currentDate,
+    //           ),
+    //         ),
+    //       );
+    //       break;
+    //     case 'place':
+    //       Navigator.of(context).pushReplacement(
+    //         MaterialPageRoute(
+    //           builder: (context) => PlaceSchedulePage(
+    //             placeData: {
+    //               'id': savedSchedule['id'],
+    //               'name': savedSchedule['name'],
+    //             },
+    //             currentDate: currentDate,
+    //           ),
+    //         ),
+    //       );
+    //       break;
+    //     default:
+    //       Navigator.of(context).pushReplacement(
+    //         MaterialPageRoute(builder: (context) => const ScheduleSelectionPage()),
+    //       );
+    //   }
+    //}
   }
 
   @override

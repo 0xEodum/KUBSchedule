@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
 import 'package:flutter_application_1/screens/settings_screen.dart';
+import 'package:flutter_application_1/screens/universal_schedule_page.dart';
 import 'package:flutter_application_1/utils/schedule_preferences.dart';
 import 'package:flutter_application_1/utils/theme_notifier.dart';
 import 'package:flutter_svg/svg.dart';
@@ -25,8 +26,11 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
   late bool isDarkMode;
+  bool _hasInternet = true;
+  bool _hasConnection = true;
+  FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -35,6 +39,10 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
     _searchController.addListener(_onSearchChanged);
     isDarkMode = ThemeNotifier().isDarkMode;
     ThemeNotifier().addListener(_onThemeChanged);
+     _focusNode.addListener(() {
+      setState(() {});
+    });
+    _checkConnectivity();
   }
 
   void _onThemeChanged() {
@@ -111,103 +119,210 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     ThemeNotifier().removeListener(_onThemeChanged);
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkConnectivity() async {
+    // Здесь должна быть реализация проверки подключения к интернету и соединения с сервером.
+    setState(() {
+      _hasInternet = true;
+      _hasConnection = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
-      appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'Поиск расписания',
-            border: InputBorder.none,
-            hintStyle: TextStyle(
-                color: isDarkMode ? Colors.grey[400] : Colors.grey,
-                fontWeight: FontWeight.w400),
-            suffixIcon: _isSearching
-                ? IconButton(
-                    icon: Icon(Icons.clear,
-                        color: isDarkMode ? Colors.white : Colors.black),
-                    onPressed: () {
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            Expanded(
+              child: _buildContent(),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildSearchBar() {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        child: Container(
+          width: constraints.maxWidth,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Color(0xFF228BE6),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _focusNode,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Roboto',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Поиск расписания..',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    if (_searchController.text.isNotEmpty) {
                       _searchController.clear();
                       setState(() {
                         _isSearching = false;
                         _searchResults.clear();
                       });
-                    },
-                  )
-                : null,
+                    }
+                  },
+                  child: SvgPicture.asset(
+                    _searchController.text.isEmpty ? 'assets/search.svg' : 'assets/clear.svg',
+                    width: 24,
+                    height: 24,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
-          style: TextStyle(
+        ),
+      );
+    },
+  );
+}
+
+  Widget _buildContent() {
+    if (!_hasInternet) {
+      return _buildNoInternet();
+    } else if (!_hasConnection) {
+      return _buildNoConnection();
+    } else if (_isLoading) {
+      return Center(child: CircularProgressIndicator());
+    } else if (_isSearching) {
+      return _searchResults.isNotEmpty
+          ? _buildSearchResults()
+          : _buildNoResults();
+    } else {
+      return _buildInitialContent();
+    }
+  }
+
+  Widget _buildNoInternet() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SvgPicture.asset(
+            'assets/no_internet.svg',
+            width: 200,
+            height: 200,
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Нет подключения к интернету',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
               color: isDarkMode ? Colors.white : Colors.black,
-              fontWeight: FontWeight.w500),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back,
-              color: isDarkMode ? Colors.white : Colors.black),
-          onPressed: () async {
-            await SchedulePreferences.clearSchedule();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ScheduleSelectionPage(),
-              ),
-            );
-          },
-        ),
-        backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: _isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : _isSearching
-                      ? _searchResults.isNotEmpty
-                          ? _buildSearchResults()
-                          : _buildNoResults()
-                      : _buildInitialContent(),
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        key: ValueKey<int>(_selectedIndex),
-        items: [
-          BottomNavigationBarItem(
-            icon: SvgPicture.asset(
-              'assets/teacher_icon.svg',
-              color: _selectedIndex == 0
-                  ? (isDarkMode ? Colors.white : Colors.blue)
-                  : (isDarkMode ? Colors.grey : Colors.black),
-            ),
-            label: 'Расписание',
-          ),
-          BottomNavigationBarItem(
-            icon: SvgPicture.asset(
-              'assets/settings.svg',
-              color: _selectedIndex == 1
-                  ? (isDarkMode ? Colors.white : Colors.blue)
-                  : (isDarkMode ? Colors.grey : Colors.black),
-            ),
-            label: 'Настройки',
           ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
-        unselectedItemColor: isDarkMode ? Colors.grey : Colors.black,
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        onTap: _onItemTapped,
       ),
     );
   }
 
+  Widget _buildNoConnection() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SvgPicture.asset(
+            'assets/no_connection.svg',
+            width: 200,
+            height: 200,
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Нет соединения с сервером',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      items: [
+        BottomNavigationBarItem(
+          icon: SvgPicture.asset(
+            'assets/house.svg',
+            color: _selectedIndex == 0
+                ? Color(0xFF228BE6)
+                : (isDarkMode ? Colors.grey : Colors.black),
+          ),
+          label: 'Главная',
+        ),
+        BottomNavigationBarItem(
+          icon: SvgPicture.asset(
+            'assets/calendar_icon.svg',
+            color: _selectedIndex == 1
+                ? Color(0xFF228BE6)
+                : (isDarkMode ? Colors.grey : Colors.black),
+          ),
+          label: 'Расписание',
+        ),
+        BottomNavigationBarItem(
+          icon: SvgPicture.asset(
+            'assets/settings.svg',
+            color: _selectedIndex == 2
+                ? Color(0xFF228BE6)
+                : (isDarkMode ? Colors.grey : Colors.black),
+          ),
+          label: 'Настройки',
+        ),
+      ],
+      currentIndex: _selectedIndex,
+      selectedItemColor: Color(0xFF228BE6),
+      unselectedItemColor: isDarkMode ? Colors.grey : Colors.black,
+      backgroundColor: isDarkMode ? Colors.black : Colors.white,
+      onTap: _onItemTapped,
+    );
+  }
+
   void _onItemTapped(int index) {
-    if (index == 1) {
+    if (index == 0) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => ScheduleSelectionPage()),
+      );
+    } else if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -221,11 +336,7 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
             },
           ),
         ),
-      ).then((_) {
-        setState(() {
-          _selectedIndex = 0;
-        });
-      });
+      );
     } else {
       setState(() {
         _selectedIndex = index;
@@ -288,38 +399,42 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   }
 
   Widget _buildSearchResults() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8.0),
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final item = _searchResults[index];
-        final tileColor = _getTileColor(item['type']);
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            elevation: 2,
-            color: isDarkMode ? _getDarkModeColor(tileColor) : tileColor,
-            child: ListTile(
-              leading: _getLeadingIcon(item['type']),
-              title: item['type'] == 'group'
-                  ? _buildGroupTitle(item)
-                  : Text(
-                      _getTitle(item),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.white : Colors.black,
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        itemCount: _searchResults.length,
+        itemBuilder: (context, index) {
+          final item = _searchResults[index];
+          final tileColor = _getTileColor(item['type']);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              width: constraints.maxWidth,
+              decoration: BoxDecoration(
+                color: isDarkMode ? _getDarkModeColor(tileColor) : tileColor,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: ListTile(
+                leading: _getLeadingIcon(item['type']),
+                title: item['type'] == 'group'
+                    ? _buildGroupTitle(item)
+                    : Text(
+                        _getTitle(item),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
-                    ),
-              onTap: () => _navigateToSchedule(context, item),
+                onTap: () => _navigateToSchedule(context, item),
+              ),
             ),
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    },
+  );
+}
 
   void _navigateToSchedule(BuildContext context, Map<String, dynamic> item) {
     final currentDate = DateTime.now();
@@ -330,9 +445,10 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-            builder: (context) => TeacherSchedulePage(
-              teacherData: item['data'],
-              currentDate: currentDate,
+            builder: (context) => UniversalSchedulePage(
+              targetData: item['data'],
+              scheduleType: ScheduleType
+                  .teacher, // или ScheduleType.group, или ScheduleType.place
             ),
           ),
           (route) => false,

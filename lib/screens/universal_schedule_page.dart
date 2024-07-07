@@ -1,51 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
+import 'package:flutter_application_1/screens/search_schedule_screen.dart';
 import 'package:flutter_application_1/screens/settings_screen.dart';
 import 'package:flutter_application_1/utils/theme_notifier.dart';
 import 'package:flutter_application_1/utils/theme_preferences.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'search_schedule_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-class TeacherSchedulePage extends StatefulWidget {
-  final Map<String, dynamic> teacherData;
-  final DateTime currentDate;
+enum ScheduleType { teacher, group, place }
 
-  const TeacherSchedulePage({
+class UniversalSchedulePage extends StatefulWidget {
+  final Map<String, dynamic> targetData;
+  final ScheduleType scheduleType;
+
+  const UniversalSchedulePage({
     Key? key,
-    required this.teacherData,
-    required this.currentDate,
+    required this.targetData,
+    required this.scheduleType,
   }) : super(key: key);
 
   @override
-  _TeacherSchedulePageState createState() => _TeacherSchedulePageState();
+  _UniversalSchedulePageState createState() => _UniversalSchedulePageState();
 }
 
-class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
+class _UniversalSchedulePageState extends State<UniversalSchedulePage> with SingleTickerProviderStateMixin {
   bool isCalendarVisible = false;
-  List<dynamic> lessons = [];
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  Map<String, List<dynamic>> lessonsCache = {};
   bool isLoading = true;
   late DateTime _currentDate;
-  CalendarFormat _calendarFormat = CalendarFormat.month;
   int _selectedIndex = 1;
-  late bool isDarkMode;
-
-  Map<String, List<dynamic>> lessonsCache = {};
   late DateTime earliestDate;
   late DateTime latestDate;
+  late bool isDarkMode;
+  late AnimationController _calendarAnimationController;
+  late Animation<double> _calendarAnimation;
 
   @override
   void initState() {
     super.initState();
     _loadTheme();
-    _currentDate = widget.currentDate;
+    _currentDate = DateTime.now();
     isDarkMode = ThemeNotifier().isDarkMode;
     ThemeNotifier().addListener(_onThemeChanged);
     earliestDate = _currentDate.subtract(const Duration(days: 7));
     latestDate = _currentDate.add(const Duration(days: 7));
+    _calendarAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _calendarAnimation = Tween<double>(begin: 0, end: 1).animate(_calendarAnimationController);
     fetchLessonsForRange(earliestDate, latestDate);
   }
 
@@ -60,6 +69,7 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
 
   @override
   void dispose() {
+    _calendarAnimationController.dispose();
     ThemeNotifier().removeListener(_onThemeChanged);
     super.dispose();
   }
@@ -71,6 +81,13 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
       });
     }
   }
+
+  Future<void> _saveTheme(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', value);
+  }
+
+  // ... (остальные методы initState, dispose, _loadTheme, _onThemeChanged остаются без изменений)
 
   Future<void> fetchLessonsForRange(DateTime start, DateTime end, {bool clearCache = false}) async {
     setState(() {
@@ -93,8 +110,21 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
 
     final startString = DateFormat('yyyy-MM-dd').format(start);
     final endString = DateFormat('yyyy-MM-dd').format(end);
-    final url = Uri.parse(
-        '$apiUrl/api/timetable/lessons/viewer?start_date=$startString&end_date=$endString&teacher=${widget.teacherData['id']}');
+    
+    String queryParam;
+    switch (widget.scheduleType) {
+      case ScheduleType.teacher:
+        queryParam = 'teacher=${widget.targetData['id']}';
+        break;
+      case ScheduleType.group:
+        queryParam = 'group=${widget.targetData['id']}';
+        break;
+      case ScheduleType.place:
+        queryParam = 'place=${widget.targetData['id']}';
+        break;
+    }
+    
+    final url = Uri.parse('$apiUrl/api/timetable/lessons/viewer?start_date=$startString&end_date=$endString&$queryParam');
 
     try {
       final response = await http.get(
@@ -129,97 +159,107 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   }
 
   void _onSwipeLeft() {
-    final nextDate = _currentDate.add(const Duration(days: 1));
-    if (nextDate.isAfter(latestDate)) {
-      fetchLessonsForRange(latestDate.add(const Duration(days: 1)), latestDate.add(const Duration(days: 7)));
+  setState(() {
+    if (_currentDate.weekday == DateTime.saturday) {
+      // Если сейчас суббота, переходим на понедельник следующей недели
+      _currentDate = _currentDate.add(const Duration(days: 2));
+    } else {
+      // В остальных случаях просто переходим на следующий день
+      _currentDate = _currentDate.add(const Duration(days: 1));
     }
-    setState(() {
-      _currentDate = nextDate;
-    });
-  }
+  });
+  _updateLessonsIfNeeded();
+}
 
-  void _onSwipeRight() {
-    final previousDate = _currentDate.subtract(const Duration(days: 1));
-    if (previousDate.isBefore(earliestDate)) {
-      fetchLessonsForRange(earliestDate.subtract(const Duration(days: 7)), earliestDate.subtract(const Duration(days: 1)));
+void _onSwipeRight() {
+  setState(() {
+    if (_currentDate.weekday == DateTime.monday) {
+      // Если сейчас понедельник, переходим на субботу предыдущей недели
+      _currentDate = _currentDate.subtract(const Duration(days: 2));
+    } else {
+      // В остальных случаях просто переходим на предыдущий день
+      _currentDate = _currentDate.subtract(const Duration(days: 1));
     }
-    setState(() {
-      _currentDate = previousDate;
-    });
+  });
+  _updateLessonsIfNeeded();
+}
+
+  void _updateLessonsIfNeeded() {
+    if (_currentDate.isAfter(latestDate) || _currentDate.isBefore(earliestDate)) {
+      fetchLessonsForRange(
+        _currentDate.subtract(const Duration(days: 7)),
+        _currentDate.add(const Duration(days: 7)),
+      );
+    }
   }
 
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    setState(() {
-      _currentDate = selectedDay;
-      isCalendarVisible = false;
-    });
-    fetchLessonsForRange(
-      selectedDay.subtract(const Duration(days: 7)),
-      selectedDay.add(const Duration(days: 7)),
-      clearCache: true
-    );
-  }
 
-  void _toggleCalendar() {
-    setState(() {
-      isCalendarVisible = !isCalendarVisible;
-    });
-  }
+  // ... (методы _onSwipeLeft, _onSwipeRight, _onDaySelected, _toggleCalendar остаются без изменений)
 
   @override
   Widget build(BuildContext context) {
-  final currentDateString = DateFormat('yyyy-MM-dd').format(_currentDate);
-  final lessonsForCurrentDate = lessonsCache[currentDateString] ?? [];
+    final currentDateString = DateFormat('yyyy-MM-dd').format(_currentDate);
+    final lessonsForCurrentDate = lessonsCache[currentDateString] ?? [];
 
-  lessonsForCurrentDate.sort((a, b) => a['number'].compareTo(b['number']));
-
-  List<Widget> lessonWidgets = [];
-  int previousLessonNumber = 0;
-
-  for (var lesson in lessonsForCurrentDate) {
-    int currentLessonNumber = lesson['number'];
-
-    if (previousLessonNumber != 0) {
-      int freeSlots = currentLessonNumber - previousLessonNumber - 1;
-      if (freeSlots > 0) {
-        lessonWidgets.add(_buildFreeTimeCard(previousLessonNumber + 1, freeSlots));
-      }
-    }
-
-    lessonWidgets.add(_buildLessonCard(lesson));
-    previousLessonNumber = currentLessonNumber;
-  }
-
-  return Scaffold(
-    backgroundColor: isDarkMode ? Colors.black : Colors.white,
-    body: SafeArea(
-      child: Column(
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: isCalendarVisible
-                ? _buildCalendar()
-                : GestureDetector(
+    return Scaffold(
+      backgroundColor: isDarkMode ? Colors.black : Colors.white,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildHeader(),
+                _buildDateNavigator(),
+                Expanded(
+                  child: GestureDetector(
                     onHorizontalDragEnd: (details) {
-                      if (details.primaryVelocity! < 0) {
+                      if (details.primaryVelocity! < -1000) {
                         _onSwipeLeft();
-                      } else if (details.primaryVelocity! > 0) {
+                      } else if (details.primaryVelocity! > 1000) {
                         _onSwipeRight();
                       }
                     },
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator())
-                        : lessonWidgets.isEmpty
-                            ? _buildNoDataFound()
-                            : ListView(children: lessonWidgets),
+                        : _buildSchedule(lessonsForCurrentDate),
                   ),
-          ),
-        ],
+                ),
+              ],
+            ),
+            if (isCalendarVisible)
+              GestureDetector(
+                onTap: _toggleCalendar,
+                child: Container(
+                  color: Colors.black54,
+                ),
+              ),
+            AnimatedBuilder(
+              animation: _calendarAnimation,
+              builder: (context, child) {
+                return Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: MediaQuery.of(context).size.height * 0.6 * _calendarAnimation.value,
+                  child: GestureDetector(
+                    onTap: () {},
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      child: _buildCalendar(),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-    bottomNavigationBar: _buildBottomNavigationBar(),
-  );
-}
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
 
   Widget _buildBottomNavigationBar() {
     return BottomNavigationBar(
@@ -261,10 +301,12 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    if (index == 1) {
+    if (index == 0) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => ScheduleSelectionPage()),
+      );
+    } else if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -274,16 +316,289 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
               setState(() {
                 isDarkMode = newValue;
               });
+              _saveTheme(newValue);
             },
           ),
         ),
-      ).then((_) {
-        setState(() {
-          _selectedIndex = 0;
-        });
+      );
+    } else {
+      setState(() {
+        _selectedIndex = index;
       });
     }
   }
+
+  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
+    setState(() {
+      _currentDate = selectedDay;
+      isCalendarVisible = false;
+    });
+    fetchLessonsForRange(
+      selectedDay.subtract(const Duration(days: 7)),
+      selectedDay.add(const Duration(days: 7)),
+      clearCache: true
+    );
+  }
+
+  void _toggleCalendar() {
+    setState(() {
+      isCalendarVisible = !isCalendarVisible;
+      if (isCalendarVisible) {
+        _calendarAnimationController.forward();
+      } else {
+        _calendarAnimationController.reverse();
+      }
+    });
+  }
+
+  Widget _buildCalendar() {
+    return TableCalendar(
+      firstDay: DateTime.utc(2010, 10, 16),
+      lastDay: DateTime.utc(2030, 3, 14),
+      focusedDay: _currentDate,
+      calendarFormat: _calendarFormat,
+      selectedDayPredicate: (day) {
+        return isSameDay(_currentDate, day);
+      },
+      onDaySelected: (selectedDay, focusedDay) {
+        setState(() {
+          _currentDate = selectedDay;
+          _toggleCalendar();
+        });
+        _updateLessonsIfNeeded();
+      },
+      onFormatChanged: (format) {
+        if (_calendarFormat != format) {
+          setState(() {
+            _calendarFormat = format;
+          });
+        }
+      },
+      onPageChanged: (focusedDay) {
+        _currentDate = focusedDay;
+      },
+      locale: 'ru_RU',
+      startingDayOfWeek: StartingDayOfWeek.monday,
+      daysOfWeekVisible: true,
+      headerStyle: HeaderStyle(
+        formatButtonVisible: false,
+        titleCentered: true,
+        titleTextStyle: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+      ),
+      calendarStyle: CalendarStyle(
+        weekendTextStyle: TextStyle(color: isDarkMode ? Colors.red[300] : Colors.red),
+        outsideTextStyle: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey),
+        todayDecoration: BoxDecoration(
+          color: isDarkMode ? Colors.blue[700] : Colors.blue[200],
+          shape: BoxShape.rectangle,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        selectedDecoration: BoxDecoration(
+          color: const Color.fromRGBO(34, 139, 230, 1),
+          shape: BoxShape.rectangle,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        defaultTextStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+      ),
+      daysOfWeekStyle: DaysOfWeekStyle(
+        weekendStyle: TextStyle(color: isDarkMode ? Colors.red[300] : Colors.red),
+        weekdayStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    String iconAsset;
+    String headerText;
+    switch (widget.scheduleType) {
+      case ScheduleType.teacher:
+        iconAsset = 'assets/teacher_icon.svg';
+        headerText = widget.targetData['short_name'];
+        break;
+      case ScheduleType.group:
+        iconAsset = 'assets/group_icon.svg';
+        headerText = widget.targetData['name'];
+        break;
+      case ScheduleType.place:
+        iconAsset = 'assets/place_icon.svg';
+        headerText = widget.targetData['name'];
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 20, left: 16, right: 16),
+      height: 50,
+      decoration: BoxDecoration(
+        color: Colors.blue,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SearchSchedulePage()),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              SvgPicture.asset(iconAsset, width: 24, height: 24, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  headerText,
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              SvgPicture.asset('assets/search.svg', width: 24, height: 24, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateNavigator() {
+  final now = DateTime.now();
+  final isToday = _currentDate.year == now.year && _currentDate.month == now.month && _currentDate.day == now.day;
+  
+  // Находим понедельник текущей недели
+  final monday = _currentDate.subtract(Duration(days: _currentDate.weekday - 1));
+  
+  final weekDays = List.generate(6, (index) => monday.add(Duration(days: index)));
+
+  return GestureDetector(
+    onTap: _toggleCalendar,
+    child: Container(
+      margin: const EdgeInsets.only(top: 20, left: 16, right: 16),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (!isToday)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _currentDate = now;
+                    });
+                  },
+                  child: Text(
+                    'Сегодня',
+                    style: TextStyle(color: Color(0xFF228BE6), fontWeight: FontWeight.bold),
+                  ),
+                )
+              else
+                SizedBox(),
+              Text(
+                DateFormat('MMMM yyyy', 'ru_RU').format(_currentDate),
+                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF228BE6)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: weekDays.map((day) {
+              final isSelected = day.day == _currentDate.day && day.month == _currentDate.month;
+              final isActualToday = day.year == now.year && day.month == now.month && day.day == now.day;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _currentDate = day;
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isActualToday 
+                        ? Colors.blue 
+                        : (isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('E', 'ru_RU').format(day).toUpperCase(), 
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isActualToday ? Colors.white : null,
+                        ),
+                      ),
+                      Text(
+                        day.day.toString(), 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isActualToday ? Colors.white : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildSchedule(List<dynamic> lessonsForCurrentDate) {
+  if (lessonsForCurrentDate.isEmpty) {
+    return _buildNoDataFound();
+  }
+
+  lessonsForCurrentDate.sort((a, b) => a['number'].compareTo(b['number']));
+
+  List<Widget> scheduleWidgets = [];
+  int previousLessonNumber = 0;
+
+  for (var lesson in lessonsForCurrentDate) {
+    int currentLessonNumber = lesson['number'];
+
+    if (previousLessonNumber != 0) {
+      int freeSlots = currentLessonNumber - previousLessonNumber - 1;
+      if (freeSlots > 0) {
+        scheduleWidgets.add(_buildFreeTimeCard(previousLessonNumber + 1, freeSlots));
+      }
+    }
+
+    scheduleWidgets.add(_buildLessonCard(lesson));
+    previousLessonNumber = currentLessonNumber;
+  }
+
+  return ListView(children: scheduleWidgets);
+}
+
+Widget _buildNoDataFound() {
+  return Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SvgPicture.asset(
+          isDarkMode ? 'assets/person_white.svg' : 'assets/person.svg',
+          width: 300,
+          height: 300,
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Занятий не найдено',
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildFreeTimeCard(int startNumber, int slots) {
   final startTime = _getStartTime(startNumber);
@@ -371,211 +686,7 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   );
 }
 
-   Widget _buildNoDataFound() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SvgPicture.asset(
-            isDarkMode ? 'assets/person_white.svg' : 'assets/person.svg',
-            width: 300,
-            height: 300,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Ничего не найдено',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendar() {
-    return TableCalendar(
-      firstDay: DateTime.utc(2010, 10, 16),
-      lastDay: DateTime.utc(2030, 3, 14),
-      focusedDay: _currentDate,
-      calendarFormat: _calendarFormat,
-      selectedDayPredicate: (day) {
-        return isSameDay(_currentDate, day);
-      },
-      onDaySelected: (selectedDay, focusedDay) {
-        _onDaySelected(selectedDay, focusedDay);
-      },
-      onFormatChanged: (format) {
-        if (_calendarFormat != format) {
-          setState(() {
-            _calendarFormat = format;
-          });
-        }
-      },
-      onPageChanged: (focusedDay) {
-        _currentDate = focusedDay;
-      },
-      locale: 'ru_RU',
-      startingDayOfWeek: StartingDayOfWeek.monday,
-      daysOfWeekVisible: true,
-      headerStyle: HeaderStyle(
-        formatButtonVisible: false,
-        titleCentered: true,
-        titleTextStyle: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-      ),
-      calendarStyle: CalendarStyle(
-        weekendTextStyle: TextStyle(color: isDarkMode ? Colors.red[300] : Colors.red),
-        outsideTextStyle: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey),
-        todayDecoration: BoxDecoration(
-          color: isDarkMode ? Colors.blue[700] : Colors.blue[200],
-          shape: BoxShape.rectangle,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        selectedDecoration: BoxDecoration(
-          color: const Color.fromRGBO(34, 139, 230, 1),
-          shape: BoxShape.rectangle,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        defaultTextStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-      ),
-      daysOfWeekStyle: DaysOfWeekStyle(
-        weekendStyle: TextStyle(color: isDarkMode ? Colors.red[300] : Colors.red),
-        weekdayStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SearchSchedulePage(),
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF228BE6),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  SvgPicture.asset('assets/teacher_icon.svg',
-                      width: 24, height: 24, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.teacherData['short_name'],
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: _toggleCalendar,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey[800] : const Color(0xFFF2F2F2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  SvgPicture.asset('assets/calendar.svg',
-                      width: 19, height: 19, color: isDarkMode ? Colors.white : Colors.black),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('dd MMM, EE', 'ru').format(_currentDate),
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKSRSCard(Map<String, dynamic> ksrs) {
-  return Card(
-    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    color: isDarkMode ? Colors.grey[800] : Colors.white,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'КСРС',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              Text(
-                DateFormat('dd.MM.yyyy').format(DateTime.parse(ksrs['date'])),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDarkMode ? Colors.white70 : Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Группы: ${ksrs['groups'].map((g) => g['name']).join(', ')}',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDarkMode ? Colors.white70 : Colors.grey[600],
-            ),
-          ),
-          if (ksrs['theme'] != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Тема: ${ksrs['theme']}',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ],
-      ),
-    ),
-  );
-}
-
-  Widget _buildLessonCard(Map<String, dynamic> lesson) {
+Widget _buildLessonCard(Map<String, dynamic> lesson) {
   final type = lesson['type'];
   final startTime = _getStartTime(lesson['number']);
   final endTime = _getEndTime(lesson['number']);
@@ -765,7 +876,7 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
   );
 }
 
-  String _getStartTime(int number) {
+String _getStartTime(int number) {
     final times = [
       '08:00',
       '09:30',
@@ -792,4 +903,6 @@ class _TeacherSchedulePageState extends State<TeacherSchedulePage> {
     ];
     return times[number - 1];
   }
+
+  // ... (методы _buildLessonCard и _buildFreeTimeCard остаются без изменений)
 }

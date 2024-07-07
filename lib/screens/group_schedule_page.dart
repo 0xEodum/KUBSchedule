@@ -39,21 +39,21 @@ class _GroupSchedulePageState extends State<GroupSchedulePage> {
   @override
   void initState() {
     super.initState();
-    _loadTheme();
-    _currentDate = widget.currentDate;
-    isDarkMode = ThemeNotifier().isDarkMode;
-    ThemeNotifier().addListener(_onThemeChanged);
-    earliestDate = _currentDate.subtract(const Duration(days: 7));
-    latestDate = _currentDate.add(const Duration(days: 7));
-    fetchLessonsForRange(earliestDate, latestDate);
+    _loadTheme(); //загрузка выбранной темы
+    _currentDate = widget.currentDate; //установка текущей даты
+    isDarkMode = ThemeNotifier().isDarkMode; //уведомитель о теме (тёмная или светлая)
+    ThemeNotifier().addListener(_onThemeChanged); //установка уведомителя
+    earliestDate = _currentDate.subtract(const Duration(days: 7)); //дата начала диапазона - неделя до выбранной даты
+    latestDate = _currentDate.add(const Duration(days: 7)); //дата конца диапазона - неделя после выбранной даты
+    fetchLessonsForRange(earliestDate, latestDate); //Получение списка занятий при загрузке страницы
   }
 
-  @override
+  @override //метод вызываемый при закрытии страницы
   void dispose() {
-    ThemeNotifier().removeListener(_onThemeChanged);
+    ThemeNotifier().removeListener(_onThemeChanged); //снятие уведомителя
     super.dispose();
   }
-
+  //При смене темы в настройках - получение уведомления и установка текущей темы в параметр isDarkMode
   void _onThemeChanged() {
     if (mounted) {
       setState(() {
@@ -61,7 +61,7 @@ class _GroupSchedulePageState extends State<GroupSchedulePage> {
       });
     }
   }
-
+  //установка темы при загрузке страницы
   Future<void> _loadTheme() async {
     final darkMode = await ThemePreferences.isDarkMode();
     if (mounted) {
@@ -71,15 +71,19 @@ class _GroupSchedulePageState extends State<GroupSchedulePage> {
     }
   }
 
+  /*
+  Получение списка занятий на дипазон дат. 
+  Аргумент по умолчанию clearCache для очистки кэша при выборе даты в календаре
+   */
   Future<void> fetchLessonsForRange(DateTime start, DateTime end, {bool clearCache = false}) async {
     setState(() {
       isLoading = true;
     });
 
     if (clearCache) {
-      lessonsCache.clear();
-    } else {
-      lessonsCache.removeWhere((key, value) {
+      lessonsCache.clear(); //если загружаем расписание на новую дату - очистить кэш
+    } else { //иначе лишь удаляем повторы
+      lessonsCache.removeWhere((key, value) { 
         final date = DateTime.parse(key);
         return date.isAfter(start.subtract(const Duration(days: 1))) &&
             date.isBefore(end.add(const Duration(days: 1)));
@@ -103,7 +107,7 @@ class _GroupSchedulePageState extends State<GroupSchedulePage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
-        final lessons = data['data'] as List<dynamic>;
+        final lessons = data['data'] as List<dynamic>; //сохраняем полученный json как список занятий
         
         for (var lesson in lessons) {
           final lessonDate = lesson['date'] as String;
@@ -330,7 +334,7 @@ class _GroupSchedulePageState extends State<GroupSchedulePage> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Ничего не найдено',
+            'Занятий не найдено',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,

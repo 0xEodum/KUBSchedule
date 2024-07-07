@@ -4,7 +4,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/splash_screen.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
@@ -35,6 +34,7 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _themeMode = mode;
     });
+    ThemePreferences.setThemeMode(mode);
   }
 
   @override
@@ -45,14 +45,14 @@ class _MyAppState extends State<MyApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      darkTheme: ThemeData.dark().copyWith(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      themeMode: _themeMode,
+      // darkTheme: ThemeData.dark().copyWith(
+      //   colorScheme: ColorScheme.fromSeed(
+      //     seedColor: Colors.blue,
+      //     brightness: Brightness.dark,
+      //   ),
+      //   useMaterial3: true,
+      // ),
+      // themeMode: _themeMode,
       home: SplashScreen(setThemeMode: setThemeMode),
     );
   }
