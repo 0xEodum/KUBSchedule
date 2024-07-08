@@ -87,7 +87,6 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage> with Sing
     await prefs.setBool('isDarkMode', value);
   }
 
-  // ... (остальные методы initState, dispose, _loadTheme, _onThemeChanged остаются без изменений)
 
   Future<void> fetchLessonsForRange(DateTime start, DateTime end, {bool clearCache = false}) async {
     setState(() {
@@ -194,8 +193,6 @@ void _onSwipeRight() {
   }
 
 
-  // ... (методы _onSwipeLeft, _onSwipeRight, _onDaySelected, _toggleCalendar остаются без изменений)
-
   @override
   Widget build(BuildContext context) {
     final currentDateString = DateFormat('yyyy-MM-dd').format(_currentDate);
@@ -246,7 +243,7 @@ void _onSwipeRight() {
                     child: Container(
                       decoration: BoxDecoration(
                         color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                       ),
                       child: _buildCalendar(),
                     ),
@@ -268,7 +265,7 @@ void _onSwipeRight() {
           icon: SvgPicture.asset(
             'assets/house.svg',
             color: _selectedIndex == 0
-                ? Color(0xFF228BE6)
+                ? const Color(0xFF228BE6)
                 : (isDarkMode ? Colors.grey : Colors.black),
           ),
           label: 'Главная',
@@ -277,7 +274,7 @@ void _onSwipeRight() {
           icon: SvgPicture.asset(
             'assets/calendar_icon.svg',
             color: _selectedIndex == 1
-                ? Color(0xFF228BE6)
+                ? const Color(0xFF228BE6)
                 : (isDarkMode ? Colors.grey : Colors.black),
           ),
           label: 'Расписание',
@@ -286,14 +283,14 @@ void _onSwipeRight() {
           icon: SvgPicture.asset(
             'assets/settings.svg',
             color: _selectedIndex == 2
-                ? Color(0xFF228BE6)
+                ? const Color(0xFF228BE6)
                 : (isDarkMode ? Colors.grey : Colors.black),
           ),
           label: 'Настройки',
         ),
       ],
       currentIndex: _selectedIndex,
-      selectedItemColor: Color(0xFF228BE6),
+      selectedItemColor: const Color(0xFF228BE6),
       unselectedItemColor: isDarkMode ? Colors.grey : Colors.black,
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       onTap: _onItemTapped,
@@ -304,7 +301,7 @@ void _onSwipeRight() {
     if (index == 0) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => ScheduleSelectionPage()),
+        MaterialPageRoute(builder: (context) => const ScheduleSelectionPage()),
       );
     } else if (index == 2) {
       Navigator.push(
@@ -487,16 +484,16 @@ void _onSwipeRight() {
                       _currentDate = now;
                     });
                   },
-                  child: Text(
+                  child: const Text(
                     'Сегодня',
                     style: TextStyle(color: Color(0xFF228BE6), fontWeight: FontWeight.bold),
                   ),
                 )
               else
-                SizedBox(),
+                const SizedBox(),
               Text(
                 DateFormat('MMMM yyyy', 'ru_RU').format(_currentDate),
-                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF228BE6)),
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF228BE6)),
               ),
             ],
           ),
@@ -513,7 +510,7 @@ void _onSwipeRight() {
                   });
                 },
                 child: Container(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isActualToday 
                         ? Colors.blue 
@@ -688,12 +685,34 @@ Widget _buildNoDataFound() {
 
 Widget _buildLessonCard(Map<String, dynamic> lesson) {
   final type = lesson['type'];
-  final startTime = _getStartTime(lesson['number']);
-  final endTime = _getEndTime(lesson['number']);
   final color = Color(int.parse(type['color'].substring(1, 7), radix: 16) + 0xFF000000);
-  final groups = lesson['groups'] as List;
-  final firstGroup = groups.isNotEmpty ? groups[0]['name'] : '';
-  final additionalGroups = groups.length > 1 ? groups.length - 1 : 0;
+  final isRemotely = lesson['is_remotely'] ?? false;
+
+  Widget buildLeftInfo() {
+    switch (widget.scheduleType) {
+      case ScheduleType.teacher:
+        return _buildGroupsInfo(lesson['groups']);
+      case ScheduleType.group:
+        return _buildTeachersInfo(lesson['teachers']);
+      case ScheduleType.place:
+        return _buildTeachersInfo(lesson['teachers']);
+      default:
+        return Container();
+    }
+  }
+
+  Widget buildRightInfo() {
+    switch (widget.scheduleType) {
+      case ScheduleType.teacher:
+        return _buildPlaceInfo(lesson['place']);
+      case ScheduleType.group:
+        return _buildPlaceInfo(lesson['place']);
+      case ScheduleType.place:
+        return _buildGroupsInfo(lesson['groups']);
+      default:
+        return Container();
+    }
+  }
 
   return Padding(
     padding: const EdgeInsets.only(bottom: 15, top: 15),
@@ -708,8 +727,8 @@ Widget _buildLessonCard(Map<String, dynamic> lesson) {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(startTime, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                Text(endTime, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                Text(_getStartTime(lesson['number']), style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                Text(_getEndTime(lesson['number']), style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
               ],
             ),
           ),
@@ -775,67 +794,8 @@ Widget _buildLessonCard(Map<String, dynamic> lesson) {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Color.fromARGB(255, 195, 255, 212).withOpacity(1),
-                                          borderRadius: BorderRadius.circular(5),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            SvgPicture.asset(
-                                              'assets/group_icon.svg',
-                                              width: 16,
-                                              height: 16,
-                                              color: isDarkMode ? Colors.white70 : Color.fromARGB(255, 77, 189, 116),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              firstGroup,
-                                              style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (additionalGroups > 0)
-                                        Container(
-                                          margin: const EdgeInsets.only(left: 4),
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Color.fromARGB(255, 139, 235, 142).withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(5),
-                                          ),
-                                          child: Text(
-                                            '+$additionalGroups',
-                                            style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Color.fromARGB(255, 255, 237, 220).withOpacity(1),
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        SvgPicture.asset(
-                                          'assets/place_icon.svg',
-                                          width: 16,
-                                          height: 16,
-                                          color: isDarkMode ? Colors.white70 : Color.fromARGB(255, 255, 147, 48),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          lesson['place']?['name'] ?? '',
-                                          style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  buildLeftInfo(),
+                                  buildRightInfo(),
                                 ],
                               ),
                             ],
@@ -853,7 +813,7 @@ Widget _buildLessonCard(Map<String, dynamic> lesson) {
                     width: 30,
                     height: 30,
                     decoration: BoxDecoration(
-                      color: Color.fromARGB(255, 206, 232, 255).withOpacity(1),
+                      color: Colors.blue.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: Center(
@@ -867,11 +827,129 @@ Widget _buildLessonCard(Map<String, dynamic> lesson) {
                     ),
                   ),
                 ),
+                if (isRemotely)
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: SvgPicture.asset(
+                      'assets/remotely_icon.svg',
+                      width: 20,
+                      height: 20,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
               ],
             ),
           ),
         ],
       ),
+    ),
+  );
+}
+
+Widget _buildGroupsInfo(List<dynamic> groups) {
+  final firstGroup = groups.isNotEmpty ? groups[0]['name'] : '';
+  final additionalGroups = groups.length > 1 ? groups.length - 1 : 0;
+
+  return Row(
+    children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color.fromARGB(255, 195, 255, 212).withOpacity(1),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Row(
+          children: [
+            SvgPicture.asset(
+              'assets/group_icon.svg',
+              width: 16,
+              height: 16,
+              color: isDarkMode ? Colors.white70 : const Color.fromARGB(255, 77, 189, 116),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              firstGroup,
+              style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
+            ),
+          ],
+        ),
+      ),
+      if (additionalGroups > 0)
+        Container(
+          margin: const EdgeInsets.only(left: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 226, 255, 234).withOpacity(1),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Text(
+            '+$additionalGroups',
+            style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : const Color.fromARGB(255, 77, 189, 116)),
+          ),
+        ),
+    ],
+  );
+}
+
+
+Widget _buildTeachersInfo(List<dynamic> teachers) {
+  final teacher = teachers.isNotEmpty ? teachers[0]['short_name'] : '';
+
+  return ConstrainedBox(
+    constraints: const BoxConstraints(maxWidth: 130), // Максимальная ширина блока
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 219, 238, 255).withOpacity(1),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset(
+            'assets/teacher_icon.svg',
+            width: 16,
+            height: 16,
+            color: isDarkMode ? Colors.white70 : const Color.fromARGB(255, 47, 130, 255),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              teacher,
+              style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : const Color.fromARGB(255, 47, 130, 255)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildPlaceInfo(Map<String, dynamic>? place) {
+  final placeName = place != null ? place['name'] : '';
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color.fromARGB(255, 255, 237, 220).withOpacity(1),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Row(
+      children: [
+        SvgPicture.asset(
+          'assets/place_icon.svg',
+          width: 16,
+          height: 16,
+          color: isDarkMode ? Colors.white70 : const Color.fromARGB(255, 255, 147, 48),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          placeName,
+          style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : const Color.fromARGB(255, 255, 147, 48)),
+        ),
+      ],
     ),
   );
 }
@@ -904,5 +982,4 @@ String _getStartTime(int number) {
     return times[number - 1];
   }
 
-  // ... (методы _buildLessonCard и _buildFreeTimeCard остаются без изменений)
 }

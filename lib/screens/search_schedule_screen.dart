@@ -460,9 +460,10 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-            builder: (context) => GroupSchedulePage(
-              groupData: item['data'],
-              currentDate: currentDate,
+            builder: (context) => UniversalSchedulePage(
+              targetData: item['data'],
+              scheduleType: ScheduleType
+                  .group, // или ScheduleType.group, или ScheduleType.place
             ),
           ),
           (route) => false,
@@ -474,9 +475,10 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-            builder: (context) => PlaceSchedulePage(
-              placeData: item['data'],
-              currentDate: currentDate,
+            builder: (context) => UniversalSchedulePage(
+              targetData: item['data'],
+              scheduleType: ScheduleType
+                  .place, // или ScheduleType.group, или ScheduleType.place
             ),
           ),
           (route) => false,
