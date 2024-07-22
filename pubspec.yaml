@@ -18,11 +18,13 @@ dependencies:
   flutter_dotenv: ^5.0.2
   table_calendar: ^3.0.0
   shared_preferences: ^2.0.15
+  flutter_local_notifications: ^9.1.5
   flutter_localizations:
     sdk: flutter
 
 
   cupertino_icons: ^1.0.6
+  timezone: ^0.8.0
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +63,16 @@ flutter:
     - assets/search.svg
     - assets/clear.svg
     - assets/free_time_icon.svg
+    - assets/KSRS.svg
+    - assets/change.svg
+    - assets/logo.svg
+    - assets/KSRS_white.svg
+    - assets/rest_day.svg
+    - assets/rest_day_white.svg
+    - assets/lecture_icon.svg
+    - assets/book_icon.svg
+    - assets/additional_icon.svg
+    - assets/clock.svg
   fonts:
     - family: Roboto
       fonts:

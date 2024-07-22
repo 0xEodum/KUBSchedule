@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
-import 'package:flutter_application_1/screens/teacher_schedule_page.dart';
-import 'package:flutter_application_1/screens/group_schedule_page.dart';
-import 'package:flutter_application_1/screens/place_schedule_page.dart';
 import 'package:flutter_application_1/utils/schedule_preferences.dart';
 import 'package:flutter_application_1/utils/theme_preferences.dart';
+import 'package:flutter_svg/svg.dart';
 
 class SplashScreen extends StatefulWidget {
   final Function(ThemeMode) setThemeMode;
@@ -95,30 +93,41 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : Colors.white,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 200,
-                height: 200,
-                child: Image.asset(
-                  'assets/loader.gif',
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.contain,
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: isDarkMode ? Colors.black : Colors.white,
+    body: SafeArea(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(123), // Скругление углов
+                child: SvgPicture.asset(
+                  'assets/logo.svg',
+                  width: 160,
+                  height: 160,
+                  fit: BoxFit.cover, // Убедитесь, что изображение заполняет всю область
                 ),
               ),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 40),
+            child: Text(
+              'Всегда под рукой',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Color(0xFFD2DBFB) : Color(0xFF43495D),
+              ),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 

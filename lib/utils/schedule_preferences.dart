@@ -1,3 +1,4 @@
+import 'package:flutter_application_1/utils/NotificationService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SchedulePreferences {
@@ -10,6 +11,8 @@ class SchedulePreferences {
     await prefs.setString(_keyScheduleType, type);
     await prefs.setInt(_keyScheduleId, id);
     await prefs.setString(_keyScheduleName, name);
+
+    await NotificationService().scheduleNotifications();
   }
 
   static Future<Map<String, dynamic>?> getSchedule() async {
@@ -33,5 +36,7 @@ class SchedulePreferences {
     await prefs.remove(_keyScheduleType);
     await prefs.remove(_keyScheduleId);
     await prefs.remove(_keyScheduleName);
+
+    await NotificationService().cancelAllNotifications();
   }
 }

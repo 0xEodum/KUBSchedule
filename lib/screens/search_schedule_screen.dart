@@ -9,9 +9,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'teacher_schedule_page.dart';
-import 'group_schedule_page.dart';
-import 'place_schedule_page.dart';
 import 'package:flutter_application_1/utils/theme_preferences.dart';
 
 class SearchSchedulePage extends StatefulWidget {

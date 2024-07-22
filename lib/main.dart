@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/utils/NotificationService.dart';
+import 'package:flutter_application_1/utils/theme_notifier.dart';
 import 'package:flutter_application_1/utils/theme_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -9,6 +11,7 @@ void main() async {
   await dotenv.load(fileName: ".env");
   await initializeDateFormatting('ru_RU', null);
   final themeMode = await ThemePreferences.getThemeMode();
+  await NotificationService().init();
   runApp(MyApp(initialThemeMode: themeMode));
 }
 
