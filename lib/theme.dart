@@ -7,10 +7,8 @@ class AppTheme {
     scaffoldBackgroundColor: Colors.white,
     textTheme: const TextTheme(
       bodyLarge: TextStyle(color: Colors.black),
-      // Добавьте другие стили текста по необходимости
     ),
     iconTheme: const IconThemeData(color: Colors.black),
-    // Добавьте другие настройки темы по необходимости
   );
 
   static final darkTheme = ThemeData(

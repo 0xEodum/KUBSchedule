@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
 import 'package:flutter_application_1/screens/settings_screen.dart';
@@ -26,7 +28,7 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   int _selectedIndex = 1;
   late bool isDarkMode;
   bool _hasInternet = true;
-  bool _hasConnection = true;
+  bool _hasServerConnection = true;
   FocusNode _focusNode = FocusNode();
 
   @override
@@ -81,6 +83,13 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   }
 
   Future<void> _performSearch(String query) async {
+    await _checkConnectivity();
+    if (!_hasInternet || !_hasServerConnection) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
     final apiUrl = dotenv.env['API_URL'] ?? '';
     final headerKey = dotenv.env['API_HEADER_KEY'] ?? '';
     final headerValue = dotenv.env['API_HEADER_VALUE'] ?? '';
@@ -121,11 +130,31 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   }
 
   Future<void> _checkConnectivity() async {
-    // Здесь должна быть реализация проверки подключения к интернету и соединения с сервером.
+    bool internet = await _checkInternetConnection();
+    bool server = await _checkServerConnection();
     setState(() {
-      _hasInternet = true;
-      _hasConnection = true;
+      _hasInternet = internet;
+      _hasServerConnection = server;
     });
+  }
+
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _checkServerConnection() async {
+    try {
+      final apiUrl = dotenv.env['API_URL'] ?? '';
+      final response = await http.get(Uri.parse('$apiUrl/docs'));
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 
   @override
@@ -213,9 +242,11 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
   Widget _buildContent() {
     if (!_hasInternet) {
       return _buildNoInternet();
-    } else if (!_hasConnection) {
-      return _buildNoConnection();
-    } else if (_isLoading) {
+    }
+    if (!_hasServerConnection) {
+      return _buildServerDown();
+    }
+    if (_isLoading) {
       return Center(child: CircularProgressIndicator());
     } else if (_isSearching) {
       return _searchResults.isNotEmpty
@@ -232,13 +263,37 @@ class _SearchSchedulePageState extends State<SearchSchedulePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SvgPicture.asset(
-            'assets/no_internet.svg',
+            isDarkMode ? 'assets/no_internet_dark.svg' : 'assets/no_internet.svg',
             width: 200,
             height: 200,
           ),
           SizedBox(height: 20),
           Text(
             'Нет подключения к интернету',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServerDown() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SvgPicture.asset(
+            isDarkMode ? 'assets/server_down_dark.svg' : 'assets/server_down.svg',
+            width: 200,
+            height: 200,
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Сервер недоступен',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,

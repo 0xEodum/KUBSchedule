@@ -38,10 +38,8 @@ class NotificationService {
     final todayTime = await NotificationPreferences.getNotificationTime(true);
     final tomorrowTime = await NotificationPreferences.getNotificationTime(false);
 
-    // Schedule today's notification
     await _scheduleNotification(0, todayTime, false);
 
-    // Schedule tomorrow's notification
     await _scheduleNotification(1, tomorrowTime, true);
   }
 
@@ -64,7 +62,7 @@ class NotificationService {
   final lessons = await _fetchLessons(isTomorrow);
   if (lessons.isEmpty) {
     print('No lessons for ${isTomorrow ? "tomorrow" : "today"}, skipping notification.');
-    return; // Пропускаем отправку уведомления, если нет занятий
+    return;
   }
 
   final notificationTitle = isTomorrow ? 'Расписание на завтра' : 'Расписание на сегодня';
@@ -140,13 +138,14 @@ class NotificationService {
   }
 
   String _formatLessonsForNotification(List<dynamic> lessons) {
-  if (lessons.isEmpty) {
-    return 'На сегодня занятий нет.';
+    if (lessons.isEmpty) {
+      return 'На сегодня занятий нет.';
+    }
+    return lessons
+        .map((lesson) =>
+            "${lesson['number']}. ${lesson['discipline']['short_name']} (${lesson['type']['short_name']})")
+        .join('\n');
   }
-  return lessons.map((lesson) => 
-    "${lesson['number']}. ${lesson['discipline']['short_name']} (${lesson['type']['short_name']})"
-  ).join('\n');
-}
 
   Future<void> cancelAllNotifications() async {
     await flutterLocalNotificationsPlugin.cancelAll();

@@ -17,6 +17,7 @@ dependencies:
   http: ^0.13.3
   flutter_dotenv: ^5.0.2
   table_calendar: ^3.0.0
+  connectivity_plus: ^6.0.5
   shared_preferences: ^2.0.15
   flutter_local_notifications: ^9.1.5
   flutter_localizations:
@@ -73,6 +74,10 @@ flutter:
     - assets/book_icon.svg
     - assets/additional_icon.svg
     - assets/clock.svg
+    - assets/no_internet.svg
+    - assets/server_down.svg
+    - assets/no_internet_dark.svg
+    - assets/server_down_dark.svg
   fonts:
     - family: Roboto
       fonts:

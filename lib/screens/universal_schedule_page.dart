@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/schedule_selection_screen.dart';
 import 'package:flutter_application_1/screens/search_schedule_screen.dart';
@@ -12,6 +14,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 enum ScheduleType { teacher, group, place }
 
@@ -31,7 +34,12 @@ class UniversalSchedulePage extends StatefulWidget {
 
 class _UniversalSchedulePageState extends State<UniversalSchedulePage>
     with TickerProviderStateMixin {
+  bool _hasInternet = true;
+  bool _hasServerConnection = true;
+  bool _wasOffline = false;
   bool isCalendarVisible = false;
+  late ScrollController _dateScrollController;
+  late List<DateTime> _dates;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   Map<String, List<dynamic>> lessonsCache = {};
   bool isLoading = true;
@@ -54,6 +62,8 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
     _loadTheme();
     _currentDate = DateTime.now();
     isDarkMode = ThemeNotifier().isDarkMode;
+    _dateScrollController = ScrollController();
+    _initializeDates();
     _scrollController = ScrollController();
     ThemeNotifier().addListener(_onThemeChanged);
     earliestDate = _currentDate.subtract(const Duration(days: 7));
@@ -73,6 +83,66 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
         .animate(_lessonDetailsAnimationController);
 
     fetchLessonsForRange(earliestDate, latestDate);
+    _checkConnectivity();
+  }
+
+  Future<void> _checkConnectivity() async {
+    bool internet = await _checkInternetConnection();
+    bool server = await _checkServerConnection();
+    setState(() {
+      _hasInternet = internet;
+      _hasServerConnection = server;
+      if (!_hasInternet || !_hasServerConnection) {
+        _wasOffline = true;
+      }
+    });
+  }
+
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _checkServerConnection() async {
+    try {
+      final apiUrl = dotenv.env['API_URL'] ?? '';
+      final response = await http.get(Uri.parse('$apiUrl/docs'));
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _initializeDates() {
+    final now = DateTime.now();
+    _dates = List.generate(365, (index) => now.add(Duration(days: index - 182)));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrentDate(animate: false);
+    });
+  }
+
+  void _scrollToCurrentDate({bool animate = true}) {
+    final currentDateIndex = _dates.indexWhere((date) => 
+      date.year == _currentDate.year && 
+      date.month == _currentDate.month && 
+      date.day == _currentDate.day
+    );
+    if (currentDateIndex != -1) {
+      final scrollPosition = currentDateIndex * 60.0; // Предполагаемая ширина элемента
+      if (animate) {
+        _dateScrollController.animateTo(
+          scrollPosition,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        _dateScrollController.jumpTo(scrollPosition);
+      }
+    }
   }
 
   Future<void> _loadTheme() async {
@@ -89,6 +159,7 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
     _calendarAnimationController.dispose();
     _lessonDetailsAnimationController.dispose();
     _scrollController.dispose();
+    _dateScrollController.dispose();
     ThemeNotifier().removeListener(_onThemeChanged);
     super.dispose();
   }
@@ -108,9 +179,22 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
 
   Future<void> fetchLessonsForRange(DateTime start, DateTime end,
       {bool clearCache = false}) async {
+    await _checkConnectivity();
+    if (!_hasInternet || !_hasServerConnection) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
+
+    if (clearCache || _wasOffline) {
+      lessonsCache.clear();
+      _wasOffline = false;
+    }
 
     if (clearCache) {
       lessonsCache.clear();
@@ -180,35 +264,31 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
   void _onSwipeLeft() {
     setState(() {
       if (_currentDate.weekday == DateTime.saturday) {
-        // Если сейчас суббота, переходим на понедельник следующей недели
         _currentDate = _currentDate.add(const Duration(days: 2));
       } else {
-        // В остальных случаях просто переходим на следующий день
         _currentDate = _currentDate.add(const Duration(days: 1));
       }
     });
-    _updateLessonsIfNeeded();
+    _updateLessonsIfNeeded(forceUpdate: _wasOffline);
   }
 
   void _onSwipeRight() {
     setState(() {
       if (_currentDate.weekday == DateTime.monday) {
-        // Если сейчас понедельник, переходим на субботу предыдущей недели
         _currentDate = _currentDate.subtract(const Duration(days: 2));
       } else {
-        // В остальных случаях просто переходим на предыдущий день
         _currentDate = _currentDate.subtract(const Duration(days: 1));
       }
     });
-    _updateLessonsIfNeeded();
+    _updateLessonsIfNeeded(forceUpdate: _wasOffline);
   }
 
-  void _updateLessonsIfNeeded() {
-    if (_currentDate.isAfter(latestDate) ||
-        _currentDate.isBefore(earliestDate)) {
+  void _updateLessonsIfNeeded({bool forceUpdate = false}) {
+    if (forceUpdate || _currentDate.isAfter(latestDate) || _currentDate.isBefore(earliestDate)) {
       fetchLessonsForRange(
         _currentDate.subtract(const Duration(days: 7)),
         _currentDate.add(const Duration(days: 7)),
+        clearCache: forceUpdate,
       );
     }
   }
@@ -234,93 +314,150 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                _buildHeader(),
-                _buildDateNavigator(),
-                Expanded(
-                  child: GestureDetector(
-                    onHorizontalDragEnd: (details) {
-                      if (details.primaryVelocity! < -1000) {
-                        _onSwipeLeft();
-                      } else if (details.primaryVelocity! > 1000) {
-                        _onSwipeRight();
-                      }
-                    },
+        child: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            if (!isCalendarVisible && !isLessonDetailsVisible) {
+              if (details.primaryVelocity! < -1000) {
+                _onSwipeLeft();
+              } else if (details.primaryVelocity! > 1000) {
+                _onSwipeRight();
+              }
+            }
+          },
+          behavior: HitTestBehavior.translucent,
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  _buildHeader(),
+                  _buildDateNavigator(),
+                  Expanded(
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator())
-                        : _buildSchedule(lessonsForCurrentDate),
+                        : _buildContent(lessonsForCurrentDate),
                   ),
-                ),
-              ],
-            ),
-            if (isCalendarVisible)
-              GestureDetector(
-                onTap: _toggleCalendar,
-                child: Container(
-                  color: Colors.black54,
-                ),
+                ],
               ),
-            AnimatedBuilder(
-              animation: _calendarAnimation,
-              builder: (context, child) {
-                return Positioned(
-                  bottom: MediaQuery.of(context).padding.bottom,
-                  left: 0,
-                  right: 0,
-                  height: MediaQuery.of(context).size.height *
-                      0.5 *
-                      _calendarAnimation.value,
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(20)),
-                      ),
-                      child: _buildCalendar(),
-                    ),
-                  ),
-                );
-              },
-            ),
-            if (isLessonDetailsVisible)
-              GestureDetector(
-                onTap: () => _toggleLessonDetails({}),
-                child: Container(
-                  color: Colors.black54,
+              if (isCalendarVisible)
+                GestureDetector(
+                  onTap: _toggleCalendar,
+                  child: Container(color: Colors.black54),
                 ),
-              ),
-            AnimatedBuilder(
-              animation: _lessonDetailsAnimation,
-              builder: (context, child) {
-                return Positioned(
-                  bottom: MediaQuery.of(context).padding.bottom,
-                  left: 0,
-                  right: 0,
-                  height: MediaQuery.of(context).size.height *
-                      0.5 *
-                      _lessonDetailsAnimation.value,
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Color.fromARGB(255, 56, 61, 78) : Colors.white,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(20)),
+              AnimatedBuilder(
+                animation: _calendarAnimation,
+                builder: (context, child) {
+                  return Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: MediaQuery.of(context).size.height *
+                        0.5 *
+                        _calendarAnimation.value,
+                    child: GestureDetector(
+                      onVerticalDragUpdate: (details) {
+                        if (details.primaryDelta! > 0) {
+                          _calendarAnimationController.value -= details.primaryDelta! / (MediaQuery.of(context).size.height * 0.5);
+                        }
+                      },
+                      onVerticalDragEnd: (details) {
+                        if (_calendarAnimationController.value < 0.5) {
+                          _toggleCalendar();
+                        } else {
+                          _calendarAnimationController.forward();
+                        }
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20)),
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              height: 20,
+                              child: Center(
+                                child: Container(
+                                  width: 40,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey,
+                                    borderRadius: BorderRadius.circular(2.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(child: _buildCalendar()),
+                          ],
+                        ),
                       ),
-                      child: currentLesson != null
-                          ? _buildLessonDetails(currentLesson!)
-                          : const SizedBox(),
                     ),
-                  ),
-                );
-              },
-            ),
-          ],
+                  );
+                },
+              ),
+              if (isLessonDetailsVisible)
+                GestureDetector(
+                  onTap: () => _toggleLessonDetails(null),
+                  child: Container(color: Colors.black54),
+                ),
+              AnimatedBuilder(
+                animation: _lessonDetailsAnimation,
+                builder: (context, child) {
+                  return Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: MediaQuery.of(context).size.height *
+                        0.5 *
+                        _lessonDetailsAnimation.value,
+                    child: GestureDetector(
+                      onVerticalDragUpdate: (details) {
+                        if (details.primaryDelta! > 0) {
+                          _lessonDetailsAnimationController.value -= details.primaryDelta! / (MediaQuery.of(context).size.height * 0.5);
+                        }
+                      },
+                      onVerticalDragEnd: (details) {
+                        if (_lessonDetailsAnimationController.value < 0.5) {
+                          _toggleLessonDetails(null);
+                        } else {
+                          _lessonDetailsAnimationController.forward();
+                        }
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20)),
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              height: 20,
+                              child: Center(
+                                child: Container(
+                                  width: 40,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey,
+                                    borderRadius: BorderRadius.circular(2.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: currentLesson != null
+                                  ? _buildLessonDetails(currentLesson!)
+                                  : const SizedBox(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
@@ -329,8 +466,7 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
 
   Widget _buildLessonDetails(Map<String, dynamic> lesson) {
     if (lesson.isEmpty)
-      return Container(); // Возвращаем пустой контейнер, если нет данных
-
+      return Container();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -726,14 +862,24 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
   );
 }
 
-  Widget _buildSchedule(List<dynamic> lessonsForCurrentDate) {
-  if (lessonsForCurrentDate.isEmpty) {
-    return _buildNoDataFound();
+Widget _buildContent(List<dynamic> lessonsForCurrentDate) {
+    if (!_hasInternet) {
+      return _buildNoInternet();
+    }
+    if (!_hasServerConnection) {
+      return _buildServerDown();
+    }
+    return _buildSchedule(lessonsForCurrentDate);
   }
 
-  if (lessonsForCurrentDate.length == 1 && lessonsForCurrentDate[0]['number'] == 0) {
-    return _buildKSRSDay();
-  }
+  Widget _buildSchedule(List<dynamic> lessonsForCurrentDate) {
+  
+    if (lessonsForCurrentDate.isEmpty) {
+      return _buildNoDataFound();
+    }
+    if (lessonsForCurrentDate.length == 1 && lessonsForCurrentDate[0]['number'] == 0) {
+      return _buildKSRSDay();
+    }
 
   lessonsForCurrentDate.sort((a, b) => a['number'].compareTo(b['number']));
 
@@ -769,6 +915,54 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
     ],
   );
 }
+
+Widget _buildNoInternet() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SvgPicture.asset(
+            isDarkMode ? 'assets/no_internet_dark.svg' : 'assets/no_internet.svg',
+            width: 200,
+            height: 200,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Нет подключения к интернету',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServerDown() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SvgPicture.asset(
+            isDarkMode ? 'assets/server_down_dark.svg' : 'assets/server_down.svg',
+            width: 200,
+            height: 200,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Сервер недоступен',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildKSRSDay() {
   return Center(
