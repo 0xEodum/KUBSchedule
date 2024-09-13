@@ -131,7 +131,9 @@ class _SettingsScreenState extends State<SettingsScreen> with TickerProviderStat
       if (isThemePanelVisible) {
         _themeAnimationController.forward();
       } else {
-        _themeAnimationController.reverse();
+        _themeAnimationController.reverse().then((_) {
+          if (mounted) setState(() {});
+        });
       }
     });
   }
@@ -142,9 +144,43 @@ class _SettingsScreenState extends State<SettingsScreen> with TickerProviderStat
       if (isLanguagePanelVisible) {
         _languageAnimationController.forward();
       } else {
-        _languageAnimationController.reverse();
+        _languageAnimationController.reverse().then((_) {
+          if (mounted) setState(() {});
+        });
       }
     });
+  }
+
+  void _handleThemePanelDrag(DragUpdateDetails details) {
+    _themeAnimationController.value -= details.primaryDelta! / (MediaQuery.of(context).size.height * 0.5);
+  }
+
+  void _handleLanguagePanelDrag(DragUpdateDetails details) {
+    _languageAnimationController.value -= details.primaryDelta! / (MediaQuery.of(context).size.height * 0.5);
+  }
+
+  void _handleThemePanelDragEnd(DragEndDetails details) {
+    if (_themeAnimationController.value < 0.5 || details.primaryVelocity! > 700) {
+      _themeAnimationController.reverse().then((_) {
+        if (mounted) setState(() {
+          isThemePanelVisible = false;
+        });
+      });
+    } else {
+      _themeAnimationController.forward();
+    }
+  }
+
+  void _handleLanguagePanelDragEnd(DragEndDetails details) {
+    if (_languageAnimationController.value < 0.5 || details.primaryVelocity! > 700) {
+      _languageAnimationController.reverse().then((_) {
+        if (mounted) setState(() {
+          isLanguagePanelVisible = false;
+        });
+      });
+    } else {
+      _languageAnimationController.forward();
+    }
   }
 
   @override
@@ -154,8 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> with TickerProviderStat
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              child: Padding(
+              Padding(
                 padding: EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,7 +212,7 @@ class _SettingsScreenState extends State<SettingsScreen> with TickerProviderStat
                   ],
                 ),
               ),
-            ),
+          
             if (isThemePanelVisible || isLanguagePanelVisible)
               GestureDetector(
                 onTap: () {
@@ -196,66 +231,76 @@ class _SettingsScreenState extends State<SettingsScreen> with TickerProviderStat
   }
 
   Widget _buildThemePanel() {
-  return AnimatedBuilder(
-    animation: _themeAnimation,
-    builder: (context, child) {
-      return Positioned(
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: MediaQuery.of(context).size.height * 0.4 * _themeAnimation.value,
-        child: GestureDetector(
-          onTap: () {},
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                _buildPanelHeader('Выберите тему'),
-                _buildThemeOption('Светлая', false),
-                _buildThemeOption('Темная', true),
-              ],
+    return AnimatedBuilder(
+      animation: _themeAnimation,
+      builder: (context, child) {
+        if (_themeAnimation.value == 0 && !isThemePanelVisible) return SizedBox.shrink();
+        return Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: MediaQuery.of(context).size.height * 0.5,
+          child: Transform.translate(
+            offset: Offset(0, MediaQuery.of(context).size.height * 0.5 * (1 - _themeAnimation.value)),
+            child: GestureDetector(
+              onVerticalDragUpdate: _handleThemePanelDrag,
+              onVerticalDragEnd: _handleThemePanelDragEnd,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  children: [
+                    _buildPanelHeader('Выберите тему'),
+                    _buildThemeOption('Светлая', false),
+                    _buildThemeOption('Темная', true),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
-Widget _buildLanguagePanel() {
-  return AnimatedBuilder(
-    animation: _languageAnimation,
-    builder: (context, child) {
-      return Positioned(
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: MediaQuery.of(context).size.height * 0.5 * _languageAnimation.value,
-        child: GestureDetector(
-          onTap: () {},
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                _buildPanelHeader('Выберите язык'),
-                _buildLanguageOption('Русский'),
-                _buildLanguageOption('English'),
-                _buildLanguageOption('հայերեն'),
-                _buildLanguageOption('қазақ'),
-              ],
+  Widget _buildLanguagePanel() {
+    return AnimatedBuilder(
+      animation: _languageAnimation,
+      builder: (context, child) {
+        if (_languageAnimation.value == 0 && !isLanguagePanelVisible) return SizedBox.shrink();
+        return Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: MediaQuery.of(context).size.height * 0.5,
+          child: Transform.translate(
+            offset: Offset(0, MediaQuery.of(context).size.height * 0.5 * (1 - _languageAnimation.value)),
+            child: GestureDetector(
+              onVerticalDragUpdate: _handleLanguagePanelDrag,
+              onVerticalDragEnd: _handleLanguagePanelDragEnd,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  children: [
+                    _buildPanelHeader('Выберите язык'),
+                    _buildLanguageOption('Русский'),
+                    _buildLanguageOption('English'),
+                    _buildLanguageOption('հայերեն'),
+                    _buildLanguageOption('қазақ'),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   Widget _buildPanelHeader(String title) {
   return Column(
