@@ -63,7 +63,6 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
     _currentDate = DateTime.now();
     isDarkMode = ThemeNotifier().isDarkMode;
     _dateScrollController = ScrollController();
-    _initializeDates();
     _scrollController = ScrollController();
     ThemeNotifier().addListener(_onThemeChanged);
     earliestDate = _currentDate.subtract(const Duration(days: 7));
@@ -117,33 +116,7 @@ class _UniversalSchedulePageState extends State<UniversalSchedulePage>
     }
   }
 
-  void _initializeDates() {
-    final now = DateTime.now();
-    _dates = List.generate(365, (index) => now.add(Duration(days: index - 182)));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToCurrentDate(animate: false);
-    });
-  }
-
-  void _scrollToCurrentDate({bool animate = true}) {
-    final currentDateIndex = _dates.indexWhere((date) => 
-      date.year == _currentDate.year && 
-      date.month == _currentDate.month && 
-      date.day == _currentDate.day
-    );
-    if (currentDateIndex != -1) {
-      final scrollPosition = currentDateIndex * 60.0; // Предполагаемая ширина элемента
-      if (animate) {
-        _dateScrollController.animateTo(
-          scrollPosition,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      } else {
-        _dateScrollController.jumpTo(scrollPosition);
-      }
-    }
-  }
+  
 
   Future<void> _loadTheme() async {
     final darkMode = await ThemePreferences.isDarkMode();
