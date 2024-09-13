@@ -190,29 +190,34 @@ class _SettingsScreenState extends State<SettingsScreen> with TickerProviderStat
       body: SafeArea(
         child: Stack(
           children: [
-              Padding(
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Настройки',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Настройки',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
                     ),
-                    SizedBox(height: 24),
-                    _buildSectionTitle('Уведомления'),
-                    _buildNotificationBlock(),
-                    SizedBox(height: 24),
-                    _buildSectionTitle('Системные'),
-                    _buildSystemBlock(),
-                  ],
+                  ),
                 ),
-              ),
-          
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      _buildSectionTitle('Уведомления'),
+                      _buildNotificationBlock(),
+                      SizedBox(height: 24),
+                      _buildSectionTitle('Системные'),
+                      _buildSystemBlock(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             if (isThemePanelVisible || isLanguagePanelVisible)
               GestureDetector(
                 onTap: () {

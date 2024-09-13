@@ -22,6 +22,7 @@ class ScheduleSelectionPage extends StatefulWidget {
 
 class _ScheduleSelectionPageState extends State<ScheduleSelectionPage>
     with SingleTickerProviderStateMixin {
+      static const int LESSON_DURATION = 80;
   late AnimationController _bellScheduleAnimationController;
   late Animation<double> _bellScheduleAnimation;
   bool isBellScheduleVisible = false;
@@ -32,6 +33,7 @@ class _ScheduleSelectionPageState extends State<ScheduleSelectionPage>
   Map<String, List<dynamic>> lessonsCache = {};
   bool isLoading = true;
   late DateTime _currentDate;
+  List<Map<String, dynamic>> bellSchedule = [];
 
   Future<void> _loadSchedule() async {
     setState(() {
@@ -189,6 +191,7 @@ class _ScheduleSelectionPageState extends State<ScheduleSelectionPage>
     super.initState();
     _loadTheme();
     _loadSchedule();
+    _loadBellSchedule();
     _currentDate = DateTime(2024, 5, 17);
     _bellScheduleAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -198,6 +201,59 @@ class _ScheduleSelectionPageState extends State<ScheduleSelectionPage>
         .animate(_bellScheduleAnimationController);
     isDarkMode = ThemeNotifier().isDarkMode;
     ThemeNotifier().addListener(_onThemeChanged);
+  }
+
+  Future<void> _loadBellSchedule() async {
+    final apiUrl = dotenv.env['API_URL'] ?? '';
+    final url = Uri.parse('$apiUrl/api/bells');
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final List<dynamic> apiResponse = json.decode(response.body);
+        bellSchedule = calculateBellSchedule(apiResponse);
+        setState(() {});
+      } else {
+        print('Failed to load bell schedule: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching bell schedule: $e');
+    }
+  }
+
+  List<Map<String, dynamic>> calculateBellSchedule(List<dynamic> apiResponse) {
+    List<Map<String, dynamic>> schedule = [];
+
+    for (int i = 0; i < apiResponse.length; i++) {
+      DateTime startTime = DateTime.parse("2023-01-01 ${apiResponse[i]['time']}:00");
+      DateTime endTime = startTime.add(Duration(minutes: LESSON_DURATION));
+
+      Map<String, dynamic> scheduleItem = {
+        "number": apiResponse[i]['number'],
+        "start": "${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}",
+        "end": "${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}",
+      };
+
+      if (i < apiResponse.length - 1) {
+        DateTime nextStartTime = DateTime.parse("2023-01-01 ${apiResponse[i + 1]['time']}:00");
+        int breakDuration = nextStartTime.difference(endTime).inMinutes;
+        
+        if (breakDuration > 0) {
+          scheduleItem["break_start"] = "${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}";
+          scheduleItem["break_end"] = "${nextStartTime.hour.toString().padLeft(2, '0')}:${nextStartTime.minute.toString().padLeft(2, '0')}";
+        } else {
+          scheduleItem["break_start"] = "-";
+          scheduleItem["break_end"] = "-";
+        }
+      } else {
+        scheduleItem["break_start"] = "-";
+        scheduleItem["break_end"] = "-";
+      }
+
+      schedule.add(scheduleItem);
+    }
+
+    return schedule;
   }
 
   @override
@@ -304,47 +360,35 @@ class _ScheduleSelectionPageState extends State<ScheduleSelectionPage>
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  height: MediaQuery.of(context).size.height *
-                      0.6 *
-                      _bellScheduleAnimation.value,
+                  height: MediaQuery.of(context).size.height * 0.6 * _bellScheduleAnimation.value,
                   child: GestureDetector(
-                    onTap: () {},
+                    onVerticalDragUpdate: (details) {
+                      _bellScheduleAnimationController.value -= details.primaryDelta! / (MediaQuery.of(context).size.height * 0.6);
+                    },
+                    onVerticalDragEnd: (details) {
+                      if (_bellScheduleAnimationController.value < 0.5) {
+                        _toggleBellSchedule();
+                      } else {
+                        _bellScheduleAnimationController.forward();
+                      }
+                    },
                     child: Container(
                       decoration: BoxDecoration(
                         color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(20)),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                       ),
                       child: Column(
                         children: [
-                          GestureDetector(
-                            onVerticalDragEnd: (details) {
-                              if (details.primaryVelocity! > 300) {
-                                _toggleBellSchedule();
-                              }
-                            },
-                            child: SizedBox(
-                              height: 40,
-                              child: Center(
-                                child: Container(
-                                  width: 40,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(2.5),
-                                  ),
+                          Container(
+                            height: 20,
+                            child: Center(
+                              child: Container(
+                                width: 40,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey,
+                                  borderRadius: BorderRadius.circular(2.5),
                                 ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Text(
-                              'Расписание звонков',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: isDarkMode ? Colors.white : Colors.black,
                               ),
                             ),
                           ),
@@ -1233,73 +1277,8 @@ class _ScheduleSelectionPageState extends State<ScheduleSelectionPage>
   }
 
   Widget _buildBellScheduleContent() {
-    final bellSchedule = [
-      {
-        "number": 1,
-        "start": "08:00",
-        "end": "09:20",
-        "break_start": "09:20",
-        "break_end": "09:30"
-      },
-      {
-        "number": 2,
-        "start": "09:30",
-        "end": "10:50",
-        "break_start": "10:50",
-        "break_end": "11:10"
-      },
-      {
-        "number": 3,
-        "start": "11:10",
-        "end": "12:30",
-        "break_start": "12:30",
-        "break_end": "12:40"
-      },
-      {
-        "number": 4,
-        "start": "12:40",
-        "end": "14:00",
-        "break_start": "14:00",
-        "break_end": "14:10"
-      },
-      {
-        "number": 5,
-        "start": "14:10",
-        "end": "15:30",
-        "break_start": "15:30",
-        "break_end": "15:40"
-      },
-      {
-        "number": 6,
-        "start": "15:40",
-        "end": "17:00",
-        "break_start": "17:00",
-        "break_end": "17:10"
-      },
-      {
-        "number": 7,
-        "start": "17:10",
-        "end": "18:30",
-        "break_start": "18:30",
-        "break_end": "18:40"
-      },
-      {
-        "number": 8,
-        "start": "18:40",
-        "end": "20:00",
-        "break_start": "20:00",
-        "break_end": "20:10"
-      },
-      {
-        "number": 9,
-        "start": "20:10",
-        "end": "21:30",
-        "break_start": "-",
-        "break_end": "-"
-      },
-    ];
-
     return Container(
+      padding: const EdgeInsets.only(top: 8),
       color: isDarkMode ? Color(0xFF383D4E) : Colors.white,
       child: ListView.builder(
         itemCount: bellSchedule.length,
@@ -1366,8 +1345,7 @@ class _ScheduleSelectionPageState extends State<ScheduleSelectionPage>
                           ),
                           const TextSpan(text: ' Перемена '),
                           TextSpan(
-                            text:
-                                '${lesson["break_start"]} - ${lesson["break_end"]}',
+                            text: '${lesson["break_start"]} - ${lesson["break_end"]}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: isDarkMode ? Colors.white : Colors.black,
